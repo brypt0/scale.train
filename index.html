@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scale Trainer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-deep: #0a0a0b;
+            --bg-surface: #131315;
+            --bg-elevated: #1a1a1d;
+            --bg-hover: #222226;
+            --text-primary: #e8e6e3;
+            --text-muted: #6b6b6f;
+            --text-dim: #4a4a4d;
+            --accent: #c4f761;
+            --accent-dim: #a3d44e;
+            --target: #61b3f7;
+            --target-dim: #4a9cd8;
+            --error: #ff6b6b;
+            --white-key: #f5f5f0;
+            --black-key: #1a1a1d;
+            --key-shadow: rgba(0,0,0,0.4);
+            --border-subtle: rgba(255,255,255,0.06);
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .logo {
+            font-family: 'Instrument Serif', serif;
+            font-size: 2rem;
+            font-weight: 400;
+            letter-spacing: -0.02em;
+        }
+        .logo span { color: var(--accent); }
+
+        .status-container { text-align: right; }
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error);
+            transition: background 0.3s ease;
+        }
+        .status-dot.connected {
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent);
+        }
+
+        .device-name {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            opacity: 0.7;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 1.5rem;
+        }
+
+        .scale-browser {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 180px);
+        }
+
+        .browser-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .browser-header h2 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.8rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-box:focus { border-color: var(--accent); }
+        .search-box::placeholder { color: var(--text-dim); }
+
+        .scale-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
+        .scale-category { margin-bottom: 0.5rem; }
+
+        .category-header {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            user-select: none;
+        }
+        .category-header:hover { color: var(--text-muted); }
+        .category-header .arrow { transition: transform 0.2s; font-size: 0.6rem; }
+        .category-header.collapsed .arrow { transform: rotate(-90deg); }
+
+        .category-scales { display: flex; flex-direction: column; gap: 2px; }
+        .category-scales.hidden { display: none; }
+
+        .scale-item {
+            padding: 0.6rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            transition: all 0.15s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .scale-item:hover { background: var(--bg-hover); }
+        .scale-item.active { background: var(--accent); color: var(--bg-deep); }
+
+        .scale-item .note-count {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            background: var(--bg-elevated);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+        }
+        .scale-item.active .note-count { background: rgba(0,0,0,0.2); color: var(--bg-deep); }
+
+        .main-content { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 1.5rem;
+            min-width: 0;
+        }
+
+        .piano-section {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-subtle);
+            overflow: hidden;
+        }
+
+        .piano-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .root-selector { display: flex; align-items: center; gap: 0.75rem; }
+        .root-selector label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+        .root-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+
+        .root-btn {
+            padding: 0.4rem 0.6rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .root-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .root-btn.active { background: var(--target); border-color: var(--target); color: var(--bg-deep); }
+
+        .current-notes-inline {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .current-notes-inline .note-badge {
+            background: var(--bg-elevated);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .piano-wrapper { 
+            overflow-x: auto; 
+            padding: 0.5rem 0;
+            width: 100%;
+        }
+
+        .piano {
+            display: flex;
+            position: relative;
+            height: 160px;
+            width: fit-content;
+            margin: 0 auto;
+        }
+
+        .key { 
+            position: relative; 
+            cursor: pointer; 
+            transition: all 0.08s ease-out;
+            user-select: none;
+        }
+
+        .key.white {
+            width: 32px;
+            height: 160px;
+            background: linear-gradient(180deg, var(--white-key) 0%, #e8e8e3 100%);
+            border: 1px solid #d0d0c8;
+            border-radius: 0 0 5px 5px;
+            z-index: 1;
+            box-shadow: 0 4px 8px var(--key-shadow), inset 0 -4px 8px rgba(0,0,0,0.05);
+        }
+        .key.white.target { background: linear-gradient(180deg, #b8d4f0 0%, #9ec5e8 100%); border-color: var(--target); }
+        .key.white.active {
+            background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%);
+            box-shadow: 0 2px 4px var(--key-shadow), 0 0 20px rgba(196, 247, 97, 0.3);
+            transform: translateY(2px);
+        }
+
+        .key.black {
+            width: 22px;
+            height: 100px;
+            background: linear-gradient(180deg, #2a2a2d 0%, var(--black-key) 100%);
+            border-radius: 0 0 4px 4px;
+            position: absolute;
+            z-index: 2;
+            box-shadow: 0 4px 8px var(--key-shadow), inset 0 -2px 4px rgba(255,255,255,0.05);
+        }
+        .key.black.target { background: linear-gradient(180deg, var(--target-dim) 0%, #3d7aa8 100%); }
+        .key.black.active {
+            background: linear-gradient(180deg, var(--accent-dim) 0%, #8ab840 100%);
+            box-shadow: 0 2px 4px var(--key-shadow), 0 0 15px rgba(196, 247, 97, 0.4);
+            height: 98px;
+        }
+
+        .scale-info {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .scale-info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .scale-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.75rem;
+            font-weight: 400;
+            line-height: 1.2;
+        }
+
+        .scale-category-badge {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            background: var(--bg-elevated);
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+        }
+
+        .scale-intervals { display: flex; gap: 0.4rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .interval-badge {
+            background: var(--target);
+            color: var(--bg-deep);
+            padding: 0.35rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .scale-mood {
+            background: var(--bg-elevated);
+            border-left: 3px solid var(--accent);
+            padding: 1rem;
+            margin-bottom: 1.25rem;
+            border-radius: 0 8px 8px 0;
+        }
+        .scale-mood-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 0.4rem;
+        }
+        .scale-mood-text {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            line-height: 1.5;
+            font-style: italic;
+        }
+
+        .scale-description {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            margin-bottom: 1.25rem;
+        }
+
+        .scale-facts { margin-bottom: 1rem; }
+        .scale-facts-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 0.6rem;
+        }
+
+        .fact-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            padding: 0.4rem 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .fact-bullet { color: var(--accent); font-size: 0.6rem; margin-top: 0.3rem; }
+
+        .scale-uses { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+        .use-tag {
+            background: var(--bg-elevated);
+            color: var(--text-muted);
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+        }
+
+        .no-scale-selected { text-align: center; padding: 3rem; color: var(--text-dim); }
+        .no-scale-selected h3 {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+        .no-scale-selected p { font-size: 0.85rem; }
+
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-subtle);
+            margin-top: 1rem;
+        }
+        .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; color: var(--text-muted); }
+        .legend-swatch { width: 16px; height: 16px; border-radius: 3px; }
+        .legend-swatch.target { background: var(--target); }
+        .legend-swatch.played { background: var(--accent); }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-surface); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+
+        /* Theory Section */
+        .theory-section {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .theory-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.25rem;
+            font-weight: 400;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .theory-block {
+            margin-bottom: 1rem;
+        }
+
+        .theory-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .theory-block h4 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+
+        .family-row {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.75rem;
+            margin-bottom: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .family-parent {
+            color: var(--accent);
+            font-weight: 600;
+            min-width: 100px;
+        }
+
+        .family-modes {
+            color: var(--text-muted);
+        }
+
+        .modal-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .modal-grid span {
+            background: var(--bg-elevated);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            color: var(--text-primary);
+        }
+
+        .theory-note {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            font-style: italic;
+        }
+
+        .brightness-bar {
+            display: flex;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 0.25rem;
+        }
+
+        .b-item {
+            flex: 1;
+            padding: 0.35rem 0.25rem;
+            text-align: center;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--bg-deep);
+        }
+
+        .b1 { background: #fff2b3; }
+        .b2 { background: #ffe066; }
+        .b3 { background: #ffd43b; }
+        .b4 { background: #fab005; }
+        .b5 { background: #f59f00; }
+        .b6 { background: #e67700; }
+        .b7 { background: #d9480f; }
+
+        .brightness-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.6rem;
+            color: var(--text-dim);
+        }
+
+        /* Watermark */
+        .watermark {
+            text-align: center;
+            padding: 2rem 0 1rem 0;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 0.05em;
+        }
+
+        .error-message {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        .error-message h3 {
+            color: var(--error);
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+        }
+        .error-message p { color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; }
+
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .scale-browser { max-height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; align-items: center; gap: 1.5rem;">
+                <h1 class="logo">Scale<span>.</span>Trainer</h1>
+                <a href="quiz.html" style="font-size: 0.75rem; color: var(--text-muted); text-decoration: none; padding: 0.4rem 0.8rem; border: 1px solid var(--border-subtle); border-radius: 6px; transition: all 0.15s;" onmouseover="this.style.background='var(--bg-elevated)'; this.style.color='var(--text-primary)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-muted)';">Quiz Mode →</a>
+            </div>
+            <div class="status-container">
+                <div class="connection-status">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Disconnected</span>
+                </div>
+                <div class="device-name" id="deviceName">No device</div>
+            </div>
+        </header>
+
+        <div id="errorContainer"></div>
+
+        <div class="main-grid">
+            <div class="scale-browser">
+                <div class="browser-header">
+                    <h2>Scale Library</h2>
+                    <input type="text" class="search-box" id="scaleSearch" placeholder="Search scales...">
+                </div>
+                <div class="scale-list" id="scaleList"></div>
+            </div>
+
+            <div class="main-content">
+                <div class="piano-section">
+                    <div class="piano-controls">
+                        <div class="root-selector">
+                            <label>Root Note</label>
+                            <div class="root-buttons" id="rootButtons"></div>
+                        </div>
+                        <div class="current-notes-inline" id="currentNotesInline">
+                            <span style="color: var(--text-dim)">Playing:</span>
+                            <span id="playingNotes">—</span>
+                        </div>
+                    </div>
+                    <div class="piano-wrapper">
+                        <div class="piano" id="piano"></div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item"><div class="legend-swatch target"></div><span>Scale notes</span></div>
+                        <div class="legend-item"><div class="legend-swatch played"></div><span>You're playing</span></div>
+                    </div>
+                </div>
+
+                <div class="scale-info" id="scaleInfo">
+                    <div class="no-scale-selected">
+                        <h3>Select a Scale</h3>
+                        <p>Choose from the library on the left to see details and practice</p>
+                    </div>
+                </div>
+
+                <!-- Theory Reference -->
+                <div class="theory-section">
+                    <h3 class="theory-title">Scale Relationships</h3>
+                    
+                    <div class="theory-block">
+                        <h4>Parent Scale Families</h4>
+                        <div class="family-row"><span class="family-parent">Major</span><span class="family-modes">Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian</span></div>
+                        <div class="family-row"><span class="family-parent">Melodic Minor</span><span class="family-modes">Melodic Min, Dorian ♭2, Lydian Aug, Lydian Dom, Mixo ♭6, Locrian ♮2, Altered</span></div>
+                        <div class="family-row"><span class="family-parent">Harmonic Minor</span><span class="family-modes">Harmonic Min, Locrian ♮6, Ionian #5, Romanian Min, Phrygian Dom, Lydian #2, Ultralocrian</span></div>
+                        <div class="family-row"><span class="family-parent">Pentatonic</span><span class="family-modes">Major Pent, Egyptian, Man Gong, Ritusen, Minor Pent</span></div>
+                    </div>
+
+                    <div class="theory-block">
+                        <h4>Modal Relationships (C Major family - all white keys)</h4>
+                        <div class="modal-grid">
+                            <span>C Ionian</span><span>D Dorian</span><span>E Phrygian</span><span>F Lydian</span><span>G Mixolydian</span><span>A Aeolian</span><span>B Locrian</span>
+                        </div>
+                        <p class="theory-note">Same notes, different root = different mode</p>
+                    </div>
+
+                    <div class="theory-block">
+                        <h4>Brightness Spectrum (Major Modes)</h4>
+                        <div class="brightness-bar">
+                            <span class="b-item b1">Lydian</span>
+                            <span class="b-item b2">Ionian</span>
+                            <span class="b-item b3">Mixo</span>
+                            <span class="b-item b4">Dorian</span>
+                            <span class="b-item b5">Aeolian</span>
+                            <span class="b-item b6">Phrygian</span>
+                            <span class="b-item b7">Locrian</span>
+                        </div>
+                        <div class="brightness-labels"><span>☀️ bright</span><span>dark 🌑</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="watermark">Remikun Arbitrage 🄯 Copyleft 2026</footer>
+    </div>
+
+    <script>
+        // ============================================
+        // SCALE DATABASE - 50+ scales with full metadata
+        // ============================================
+        const SCALES = [
+            // === MAJOR MODES ===
+            {
+                name: "Ionian",
+                altName: "Major Scale",
+                category: "Major Modes",
+                intervals: [0, 2, 4, 5, 7, 9, 11],
+                mood: "Bright, happy, resolved, triumphant",
+                description: "The foundation of Western music. This is THE major scale - the one you probably learned first. All other modes are derived from starting on different degrees of this scale.",
+                funFacts: [
+                    "The 'Do Re Mi' scale from Sound of Music",
+                    "Used in virtually every pop song's chorus for that uplifting feeling",
+                    "The intervals spell out the pattern: W-W-H-W-W-W-H (whole and half steps)"
+                ],
+                commonUses: ["Pop", "Classical", "Folk", "Children's music", "National anthems"]
+            },
+            {
+                name: "Dorian",
+                category: "Major Modes",
+                intervals: [0, 2, 3, 5, 7, 9, 10],
+                mood: "Minor but hopeful, sophisticated, jazzy, groovy",
+                description: "The second mode - like natural minor but with a raised 6th. This one note difference gives it a brighter, more optimistic minor sound. It's the 'cool' minor scale.",
+                funFacts: [
+                    "Miles Davis's 'So What' is entirely in Dorian",
+                    "Santana uses this constantly - that's the Santana sound",
+                    "The Simpsons theme is in Dorian",
+                    "Pink Floyd's 'Another Brick in the Wall' guitar solo"
+                ],
+                commonUses: ["Jazz", "Funk", "Rock solos", "Video game music", "Celtic music"]
+            },
+            {
+                name: "Phrygian",
+                category: "Major Modes",
+                intervals: [0, 1, 3, 5, 7, 8, 10],
+                mood: "Dark, exotic, Spanish, mysterious, tense",
+                description: "The third mode - that distinctive half-step from root to 2nd gives it an unmistakably 'Spanish' or 'Middle Eastern' flavor. Instant drama.",
+                funFacts: [
+                    "The 'flamenco' sound in a nutshell",
+                    "Metallica uses this extensively for heavy riffs",
+                    "The White Stripes' 'Seven Nation Army' main riff",
+                    "Named after ancient Phrygia (modern-day Turkey)"
+                ],
+                commonUses: ["Flamenco", "Metal", "Middle Eastern music", "Film scores"]
+            },
+            {
+                name: "Lydian",
+                category: "Major Modes",
+                intervals: [0, 2, 4, 6, 7, 9, 11],
+                mood: "Dreamy, floating, ethereal, magical, wonder",
+                description: "The fourth mode - major scale with a raised 4th. That #4 creates a tritone with the root, giving it a floating, unresolved, almost sci-fi quality.",
+                funFacts: [
+                    "The Simpsons theme uses Lydian (combined with other modes)",
+                    "John Williams loves this for 'wonder' moments (E.T., flying scenes)",
+                    "Steve Vai's signature sound",
+                    "Used in the Jetsons theme for that 'futuristic' feeling"
+                ],
+                commonUses: ["Film scores", "Progressive rock", "Jazz fusion", "Dream pop"]
+            },
+            {
+                name: "Mixolydian",
+                category: "Major Modes",
+                intervals: [0, 2, 4, 5, 7, 9, 10],
+                mood: "Bluesy, laid-back, classic rock, slightly unresolved",
+                description: "The fifth mode - major scale with a flatted 7th. The dominant scale. It's major but with attitude - that b7 adds edge and prevents things from sounding too 'clean'.",
+                funFacts: [
+                    "The Beatles used this constantly - 'Norwegian Wood', 'Tomorrow Never Knows'",
+                    "Basically the classic rock scale",
+                    "The Grateful Dead's jam sound",
+                    "AC/DC lives in Mixolydian territory"
+                ],
+                commonUses: ["Rock", "Blues", "Folk rock", "Jam bands", "Country"]
+            },
+            {
+                name: "Aeolian",
+                altName: "Natural Minor",
+                category: "Major Modes",
+                intervals: [0, 2, 3, 5, 7, 8, 10],
+                mood: "Sad, dark, serious, melancholic, dramatic",
+                description: "The sixth mode - THE natural minor scale. The foundation for most minor key music in Western tradition. Pure, unaltered sadness.",
+                funFacts: [
+                    "The relative minor of every major key",
+                    "R.E.M.'s 'Losing My Religion' is a perfect example",
+                    "Most minor key pop songs use this as their base",
+                    "The 'La Ti Do' if you start from La in solfege"
+                ],
+                commonUses: ["Pop", "Rock", "Classical", "Most minor-key music"]
+            },
+            {
+                name: "Locrian",
+                category: "Major Modes",
+                intervals: [0, 1, 3, 5, 6, 8, 10],
+                mood: "Unstable, dissonant, dark, unsettling, evil",
+                description: "The seventh mode - the 'forbidden' mode. With a diminished 5th, it can't form a stable tonic chord, making it almost unusable for tonal music. But that instability is exactly what makes it useful for certain effects.",
+                funFacts: [
+                    "The only mode with a diminished 5th (tritone from root)",
+                    "Rarely used as a key center - more for passing moments",
+                    "Some metal bands use it for maximum darkness",
+                    "Army of Darkness theme flirts with Locrian"
+                ],
+                commonUses: ["Metal", "Horror soundtracks", "Avant-garde jazz", "Transitional passages"]
+            },
+
+            // === MINOR SCALE VARIANTS ===
+            {
+                name: "Harmonic Minor",
+                category: "Minor Variants",
+                intervals: [0, 2, 3, 5, 7, 8, 11],
+                mood: "Classical, exotic, dramatic, neoclassical, vampire-esque",
+                description: "Natural minor with a raised 7th. That augmented 2nd gap between b6 and major 7 creates the distinctive 'classical' or 'Egyptian' sound. Essential for classical harmony because it provides a proper leading tone.",
+                funFacts: [
+                    "Yngwie Malmsteen's bread and butter",
+                    "That 'Phantom of the Opera' sound",
+                    "Required for making a V7 chord in minor keys",
+                    "The 3-semitone gap (augmented 2nd) is the signature sound"
+                ],
+                commonUses: ["Classical", "Neoclassical metal", "Baroque", "Middle Eastern music"]
+            },
+            {
+                name: "Melodic Minor",
+                altName: "Jazz Minor",
+                category: "Minor Variants",
+                intervals: [0, 2, 3, 5, 7, 9, 11],
+                mood: "Sophisticated, jazzy, smooth, modern, ambiguous",
+                description: "Minor with raised 6th and 7th - basically major with a minor 3rd. In classical, it descends as natural minor. In jazz, it's the same both ways (hence 'jazz minor'). Parent scale to many jazz modes.",
+                funFacts: [
+                    "The basis for the altered scale (superlocrian)",
+                    "Ascending melodic minor = Dorian with a major 7th",
+                    "Jazz musicians just call this 'melodic minor' and use it both directions",
+                    "Parent of Lydian Dominant, Altered, and other hip scales"
+                ],
+                commonUses: ["Jazz", "Fusion", "Contemporary classical", "Film scoring"]
+            },
+            {
+                name: "Dorian b2",
+                altName: "Phrygian #6",
+                category: "Minor Variants",
+                intervals: [0, 1, 3, 5, 7, 9, 10],
+                mood: "Exotic, tense, mysterious, Phrygian but brighter",
+                description: "Second mode of melodic minor. Like Phrygian but with a natural 6th instead of flat 6th. Keeps the Spanish flavor but adds a slightly brighter element.",
+                funFacts: [
+                    "Also called 'Phrygian natural 6' or 'Assyrian'",
+                    "Used in Klezmer music",
+                    "A favorite in progressive metal",
+                    "Gives you Phrygian darkness with Dorian hope"
+                ],
+                commonUses: ["Jazz", "Fusion", "Klezmer", "Progressive metal"]
+            },
+            {
+                name: "Hungarian Minor",
+                altName: "Double Harmonic Minor",
+                category: "Minor Variants",
+                intervals: [0, 2, 3, 6, 7, 8, 11],
+                mood: "Dramatic, Eastern European, gypsy, intense, exotic",
+                description: "Harmonic minor with a raised 4th. Two augmented seconds give it an intensely exotic, almost 'gypsy' flavor. Very dramatic and distinctive.",
+                funFacts: [
+                    "The 'Hungarian Gypsy' sound in a nutshell",
+                    "Dick Dale's 'Misirlou' (Pulp Fiction theme) is based on this",
+                    "Also called 'Gypsy Minor'",
+                    "Contains two augmented 2nds - maximum exotic tension"
+                ],
+                commonUses: ["Eastern European folk", "Surf rock", "Film scores", "Metal"]
+            },
+            {
+                name: "Neapolitan Minor",
+                category: "Minor Variants",
+                intervals: [0, 1, 3, 5, 7, 8, 11],
+                mood: "Dark, classical, dramatic, operatic, tense",
+                description: "Harmonic minor with a flatted 2nd. Named after the Neapolitan chord (bII). Extremely dark and dramatic - used in classical and film music for intense moments.",
+                funFacts: [
+                    "Named for its association with Neapolitan opera",
+                    "Creates the famous 'Neapolitan chord' (bII major)",
+                    "Favored by composers for tragic scenes",
+                    "Combines Phrygian darkness with harmonic minor drama"
+                ],
+                commonUses: ["Classical", "Opera", "Film scores", "Gothic metal"]
+            },
+            {
+                name: "Neapolitan Major",
+                category: "Minor Variants",
+                intervals: [0, 1, 3, 5, 7, 9, 11],
+                mood: "Mysterious, ethereal, otherworldly, melancholic beauty",
+                description: "Melodic minor with a flatted 2nd. Brighter than Neapolitan minor but still dark and unusual. Has a strange, floating quality.",
+                funFacts: [
+                    "Less common than Neapolitan minor but equally beautiful",
+                    "Used in Romantic era classical music",
+                    "Creates unique chord progressions",
+                    "A favorite for 'otherworldly' moments in film"
+                ],
+                commonUses: ["Classical", "Film scores", "Avant-garde"]
+            },
+
+            // === PENTATONIC SCALES ===
+            {
+                name: "Major Pentatonic",
+                category: "Pentatonic",
+                intervals: [0, 2, 4, 7, 9],
+                mood: "Happy, simple, universal, folk, bright",
+                description: "The five-note major scale - remove the 4th and 7th and you can't play a wrong note. Found in virtually every musical culture worldwide. The 'universal' scale.",
+                funFacts: [
+                    "Bobby McFerrin demonstrated the whole world knows this scale instinctively",
+                    "Most folk music worldwide uses pentatonic scales",
+                    "'Amazing Grace' and 'My Girl' are pure major pentatonic",
+                    "The black keys on piano form a pentatonic scale"
+                ],
+                commonUses: ["Folk", "Country", "Pop", "World music", "Children's songs"]
+            },
+            {
+                name: "Minor Pentatonic",
+                category: "Pentatonic",
+                intervals: [0, 3, 5, 7, 10],
+                mood: "Bluesy, rock, soulful, raw, powerful",
+                description: "THE rock and blues scale. Five notes, infinite possibilities. This is what most guitarists learn first for soloing - you literally cannot sound bad with it.",
+                funFacts: [
+                    "The foundation of blues, rock, and R&B soloing",
+                    "Slash, Jimmy Page, Angus Young - all pentatonic masters",
+                    "'Smoke on the Water' riff is minor pentatonic",
+                    "Same notes as major pentatonic, different starting point"
+                ],
+                commonUses: ["Blues", "Rock", "R&B", "Soul", "Metal"]
+            },
+            {
+                name: "Egyptian",
+                altName: "Suspended Pentatonic",
+                category: "Pentatonic",
+                intervals: [0, 2, 5, 7, 10],
+                mood: "Ancient, desert, suspended, neither major nor minor",
+                description: "A pentatonic with no 3rd - creates an ambiguous, ancient sound. Neither clearly major nor minor, it evokes vast open spaces and antiquity.",
+                funFacts: [
+                    "Used in 'Scarborough Fair'",
+                    "Popular in film scores for ancient/desert scenes",
+                    "The 'suspended' sound comes from missing the 3rd",
+                    "Common in traditional Chinese music too"
+                ],
+                commonUses: ["Film scores", "World music", "New age", "Ambient"]
+            },
+            {
+                name: "Hirajoshi",
+                category: "Pentatonic",
+                intervals: [0, 2, 3, 7, 8],
+                mood: "Japanese, melancholic, beautiful, contemplative",
+                description: "Traditional Japanese pentatonic scale. Has a distinctly Asian sound due to the semitone intervals. Instantly evocative.",
+                funFacts: [
+                    "Used extensively in traditional Japanese koto music",
+                    "Metallica used it in 'Enter Sandman' bridge",
+                    "The semitones create the 'Japanese' sound",
+                    "Popular in video game music set in Japan"
+                ],
+                commonUses: ["Japanese traditional", "Film scores", "Metal", "Video games"]
+            },
+            {
+                name: "In Sen",
+                category: "Pentatonic",
+                intervals: [0, 1, 5, 7, 10],
+                mood: "Dark Japanese, mysterious, tense, haunting",
+                description: "Another Japanese scale, darker than Hirajoshi. The half-step at the beginning creates immediate tension. Used in shakuhachi (bamboo flute) music.",
+                funFacts: [
+                    "Traditional shakuhachi flute scale",
+                    "More dissonant than Hirajoshi",
+                    "Used in Japanese horror soundtracks",
+                    "The b2 creates instant tension"
+                ],
+                commonUses: ["Japanese traditional", "Horror", "Ambient", "Meditation music"]
+            },
+            {
+                name: "Yo",
+                category: "Pentatonic",
+                intervals: [0, 2, 5, 7, 9],
+                mood: "Bright Japanese, festive, folk, cheerful",
+                description: "The 'major' sounding Japanese pentatonic. Less melancholic than Hirajoshi, used in folk and festival music. Bright and celebratory.",
+                funFacts: [
+                    "Used in Japanese folk songs and matsuri (festival) music",
+                    "Has a more 'major' feel than other Japanese scales",
+                    "Common in anime soundtracks for happy scenes",
+                    "Similar to major pentatonic but with different emphasis"
+                ],
+                commonUses: ["Japanese folk", "Anime", "Video games", "Festival music"]
+            },
+            {
+                name: "Iwato",
+                category: "Pentatonic",
+                intervals: [0, 1, 5, 6, 10],
+                mood: "Extremely dark, dissonant, ominous, ancient",
+                description: "The darkest Japanese pentatonic. With two tritone relationships, it's extremely tense and dissonant. Used sparingly for maximum effect.",
+                funFacts: [
+                    "Contains two tritones - maximum darkness",
+                    "Named after a cave in Japanese mythology",
+                    "Used for supernatural or ominous moments",
+                    "The 'evil' Japanese scale"
+                ],
+                commonUses: ["Horror", "Japanese traditional", "Avant-garde", "Dark ambient"]
+            },
+            {
+                name: "Kumoi",
+                category: "Pentatonic",
+                intervals: [0, 2, 3, 7, 9],
+                mood: "Bittersweet, Japanese, nostalgic, wistful",
+                description: "A beautiful Japanese pentatonic that's minor-ish but with a major 6th, giving it a bittersweet, nostalgic quality. Very evocative.",
+                funFacts: [
+                    "Popular in Japanese court music (gagaku)",
+                    "Steely Dan used this in 'Aja'",
+                    "The major 6th adds unexpected brightness",
+                    "Means 'nine layers' - referring to clouds"
+                ],
+                commonUses: ["Jazz", "Japanese traditional", "Fusion", "Film scores"]
+            },
+
+            // === BLUES SCALES ===
+            {
+                name: "Blues Scale",
+                altName: "Minor Blues",
+                category: "Blues",
+                intervals: [0, 3, 5, 6, 7, 10],
+                mood: "Gritty, soulful, expressive, raw, emotional",
+                description: "Minor pentatonic plus the 'blue note' (b5). That added note is the soul of the blues - it creates tension that wants to resolve. Six notes of pure emotion.",
+                funFacts: [
+                    "The b5 (blue note) can be bent for extra expression",
+                    "Entire careers built on this one scale (B.B. King, SRV)",
+                    "Works over both major and minor chords",
+                    "The blue note shouldn't 'land' - it's a passing tone"
+                ],
+                commonUses: ["Blues", "Rock", "Jazz", "R&B", "Soul"]
+            },
+            {
+                name: "Major Blues",
+                category: "Blues",
+                intervals: [0, 2, 3, 4, 7, 9],
+                mood: "Happy blues, country, upbeat, twangy",
+                description: "Major pentatonic with an added #2/b3. Gives you that country/blues hybrid sound. Brighter than minor blues but still has grit.",
+                funFacts: [
+                    "The 'country' blues scale",
+                    "That b3 to natural 3 move is classic Allman Brothers",
+                    "Works great over dominant 7 chords",
+                    "Mixing this with minor blues = advanced blues soloing"
+                ],
+                commonUses: ["Country", "Blues", "Southern rock", "Jazz"]
+            },
+
+            // === SYMMETRIC SCALES ===
+            {
+                name: "Whole Tone",
+                category: "Symmetric",
+                intervals: [0, 2, 4, 6, 8, 10],
+                mood: "Dreamy, hazy, floating, impressionistic, disorienting",
+                description: "Every note is a whole step apart - no half steps means no strong pull in any direction. Creates a floating, dreamlike quality. Very impressionistic.",
+                funFacts: [
+                    "Debussy's signature sound",
+                    "Only 2 whole tone scales exist (one starting on C, one on Db)",
+                    "Stevie Wonder's 'You Are the Sunshine of My Life' intro",
+                    "Used in cartoons for 'dream sequences'"
+                ],
+                commonUses: ["Impressionist classical", "Jazz", "Film scores", "Dream sequences"]
+            },
+            {
+                name: "Diminished Half-Whole",
+                altName: "Octatonic",
+                category: "Symmetric",
+                intervals: [0, 1, 3, 4, 6, 7, 9, 10],
+                mood: "Tense, dark, mysterious, chromatic, slippery",
+                description: "Alternating half and whole steps starting with a half step. Eight notes, completely symmetrical. Used over diminished chords and for creating tension.",
+                funFacts: [
+                    "Only 3 diminished scales exist (due to symmetry)",
+                    "Every diminished 7th chord can use this scale",
+                    "Steely Dan's secret weapon",
+                    "Creates amazing chromatic lines"
+                ],
+                commonUses: ["Jazz", "Classical", "Film scores", "Progressive rock"]
+            },
+            {
+                name: "Diminished Whole-Half",
+                category: "Symmetric",
+                intervals: [0, 2, 3, 5, 6, 8, 9, 11],
+                mood: "Dominant, tense, bluesy-chromatic, complex",
+                description: "Alternating whole and half steps starting with a whole step. THE scale for dominant 7(b9) chords. Jazz players use this constantly.",
+                funFacts: [
+                    "The 'dominant diminished' scale",
+                    "Fits perfectly over 7(b9) chords",
+                    "Rimsky-Korsakov used this extensively",
+                    "Same notes as half-whole, different starting point"
+                ],
+                commonUses: ["Jazz", "Bebop", "Fusion", "Classical"]
+            },
+            {
+                name: "Chromatic",
+                category: "Symmetric",
+                intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                mood: "Tense, passing, technical, no tonal center",
+                description: "All 12 notes. Not really a 'scale' in the traditional sense - more of a resource. Used for chromatic runs and when you want maximum tension or a 'falling' effect.",
+                funFacts: [
+                    "The building block of all Western music",
+                    "Flight of the Bumblebee is mostly chromatic",
+                    "Bebop players use chromatic passing tones constantly",
+                    "Serial/12-tone music uses all 12 equally"
+                ],
+                commonUses: ["Classical", "Jazz", "Technical passages", "Sound effects"]
+            },
+            {
+                name: "Augmented",
+                altName: "Hexatonic",
+                category: "Symmetric",
+                intervals: [0, 3, 4, 7, 8, 11],
+                mood: "Mysterious, unstable, otherworldly, John Coltrane",
+                description: "Alternating minor 3rds and half steps. Creates two interlocking augmented triads. Very unstable, very Coltrane.",
+                funFacts: [
+                    "Only 4 augmented scales exist",
+                    "Coltrane used this in 'Giant Steps' era",
+                    "Creates a very 'outside' sound",
+                    "Made of two augmented triads a half step apart"
+                ],
+                commonUses: ["Jazz", "Avant-garde", "Film scores"]
+            },
+
+            // === DOMINANT/JAZZ SCALES ===
+            {
+                name: "Lydian Dominant",
+                altName: "Lydian b7",
+                category: "Dominant/Jazz",
+                intervals: [0, 2, 4, 6, 7, 9, 10],
+                mood: "Bright dominant, sophisticated, Simpsons, fusion",
+                description: "Fourth mode of melodic minor. Lydian with a b7 - bright and floaty but with dominant function. The 'Simpsons' scale (sort of).",
+                funFacts: [
+                    "The Simpsons theme is often cited as Lydian Dominant",
+                    "Perfect for non-resolving dominant chords",
+                    "Steely Dan loves this sound",
+                    "The 'hip' dominant scale"
+                ],
+                commonUses: ["Jazz", "Fusion", "Funk", "Progressive rock"]
+            },
+            {
+                name: "Mixolydian b6",
+                altName: "Hindu Scale",
+                category: "Dominant/Jazz",
+                intervals: [0, 2, 4, 5, 7, 8, 10],
+                mood: "Exotic dominant, Indian, melancholic dominant",
+                description: "Fifth mode of melodic minor. Mixolydian with a b6. Has an Indian/Hindu flavor. Used over dominant chords resolving to minor.",
+                funFacts: [
+                    "Also called 'Hindu' or 'Aeolian Dominant'",
+                    "Common in Indian classical music",
+                    "Creates dominant chords with a darker color",
+                    "Great for V7 resolving to minor i"
+                ],
+                commonUses: ["Jazz", "Indian fusion", "Film scores"]
+            },
+            {
+                name: "Altered Scale",
+                altName: "Super Locrian",
+                category: "Dominant/Jazz",
+                intervals: [0, 1, 3, 4, 6, 8, 10],
+                mood: "Maximum tension, outside, dissonant, bebop",
+                description: "Seventh mode of melodic minor. Every possible alteration on a dominant chord (b9, #9, b5, #5). Maximum tension before resolution. THE bebop secret weapon.",
+                funFacts: [
+                    "Contains ALL altered tensions: b9, #9, b5/b13, #5/b13",
+                    "Charlie Parker's outside sound",
+                    "Use this on any V7 resolving to I",
+                    "Also called 'diminished whole tone'"
+                ],
+                commonUses: ["Bebop", "Modern jazz", "Fusion"]
+            },
+            {
+                name: "Lydian Augmented",
+                category: "Dominant/Jazz",
+                intervals: [0, 2, 4, 6, 8, 9, 11],
+                mood: "Extremely bright, floating, ethereal, unstable",
+                description: "Third mode of melodic minor. Lydian with a #5. Creates a major 7(#5) sound. Very bright, very floaty, very Wayne Shorter.",
+                funFacts: [
+                    "Wayne Shorter's signature sound",
+                    "Creates major 7(#11, #5) chords",
+                    "Maximum 'floating' without going atonal",
+                    "Sounds like Lydian on steroids"
+                ],
+                commonUses: ["Modern jazz", "Film scores", "Fusion"]
+            },
+
+            // === BEBOP SCALES ===
+            {
+                name: "Bebop Dominant",
+                category: "Bebop",
+                intervals: [0, 2, 4, 5, 7, 9, 10, 11],
+                mood: "Swinging, chromatic, flowing, classic jazz",
+                description: "Mixolydian with an added major 7th. The extra note makes the scale 8 notes, so chord tones land on downbeats when playing eighth notes. Bebop 101.",
+                funFacts: [
+                    "The 'bebop' sound in one scale",
+                    "8 notes = chord tones on downbeats",
+                    "Charlie Parker and Dizzy Gillespie's foundation",
+                    "The added note is a chromatic passing tone"
+                ],
+                commonUses: ["Bebop", "Jazz", "Swing"]
+            },
+            {
+                name: "Bebop Major",
+                category: "Bebop",
+                intervals: [0, 2, 4, 5, 7, 8, 9, 11],
+                mood: "Bright, chromatic, swinging, sophisticated",
+                description: "Major scale with an added #5/b6. Another 8-note scale keeping chord tones on downbeats. For major 7 and 6 chords.",
+                funFacts: [
+                    "Use over major 7 or major 6 chords",
+                    "The #5 is a chromatic passing tone",
+                    "Creates flowing, never-ending lines",
+                    "Less common than bebop dominant"
+                ],
+                commonUses: ["Bebop", "Jazz", "Standards"]
+            },
+            {
+                name: "Bebop Minor",
+                altName: "Bebop Dorian",
+                category: "Bebop",
+                intervals: [0, 2, 3, 4, 5, 7, 9, 10],
+                mood: "Minor, swinging, chromatic, smooth",
+                description: "Dorian with an added major 3rd. Gives you that chromatic movement between b3 and natural 3. Great for minor 7 chords.",
+                funFacts: [
+                    "The minor version of bebop dominant",
+                    "That 3-4 chromatic run is essential bebop vocabulary",
+                    "Use over minor 7 chords",
+                    "Creates smooth, swinging minor lines"
+                ],
+                commonUses: ["Bebop", "Jazz", "Swing"]
+            },
+
+            // === WORLD/EXOTIC SCALES ===
+            {
+                name: "Phrygian Dominant",
+                altName: "Spanish Gypsy",
+                category: "World/Exotic",
+                intervals: [0, 1, 4, 5, 7, 8, 10],
+                mood: "Spanish, flamenco, Middle Eastern, dramatic, exotic",
+                description: "Fifth mode of harmonic minor. Phrygian with a major 3rd. THE flamenco scale. That major 3rd over the b2 is pure Spanish fire.",
+                funFacts: [
+                    "The 'Spanish' scale everyone thinks of",
+                    "Dick Dale's surf guitar sound",
+                    "Called 'Freygish' in Jewish music",
+                    "Dominant chord built on Phrygian root"
+                ],
+                commonUses: ["Flamenco", "Middle Eastern", "Surf rock", "Metal"]
+            },
+            {
+                name: "Double Harmonic Major",
+                altName: "Byzantine",
+                category: "World/Exotic",
+                intervals: [0, 1, 4, 5, 7, 8, 11],
+                mood: "Extremely exotic, Byzantine, Middle Eastern, ancient",
+                description: "Major scale with b2 and b6. Two augmented 2nds create an intensely exotic sound. Ancient and mysterious.",
+                funFacts: [
+                    "Also called 'Arabic' or 'Gypsy Major'",
+                    "Misirlou (Pulp Fiction) uses this",
+                    "Contains two augmented 2nds",
+                    "Used in Byzantine church music"
+                ],
+                commonUses: ["Middle Eastern", "Greek", "Film scores", "Surf rock"]
+            },
+            {
+                name: "Persian",
+                category: "World/Exotic",
+                intervals: [0, 1, 4, 5, 6, 8, 11],
+                mood: "Ancient Persian, dark exotic, mysterious, intense",
+                description: "An ancient scale with a very distinctive sound - the b2, major 3, and b5 create an unmistakably 'Persian' flavor.",
+                funFacts: [
+                    "Used in traditional Persian classical music",
+                    "Very dark due to the b5",
+                    "Contains two augmented 2nds like Hungarian minor",
+                    "Less common but very distinctive"
+                ],
+                commonUses: ["Persian classical", "World fusion", "Film scores"]
+            },
+            {
+                name: "Arabian",
+                category: "World/Exotic",
+                intervals: [0, 2, 4, 5, 6, 8, 10],
+                mood: "Middle Eastern, exotic, desert, mystical",
+                description: "Major scale with b5 and b6. That b5 creates the 'snake charmer' sound everyone associates with Arabia (though it's actually more Orientalist fantasy than authentic).",
+                funFacts: [
+                    "The 'Hollywood Middle East' sound",
+                    "Used more in Western music depicting Arabia",
+                    "Real Arabic music has many more scales (maqamat)",
+                    "That b5 is the 'exotic' note"
+                ],
+                commonUses: ["Film scores", "Video games", "World fusion"]
+            },
+            {
+                name: "Romanian Minor",
+                altName: "Ukrainian Dorian",
+                category: "World/Exotic",
+                intervals: [0, 2, 3, 6, 7, 9, 10],
+                mood: "Eastern European, gypsy, dark folk, dramatic",
+                description: "Dorian with a #4. That raised 4th adds the 'gypsy' flavor to an otherwise dark minor sound. Very evocative of Eastern European folk music.",
+                funFacts: [
+                    "A favorite in Eastern European folk music",
+                    "The #4 is the 'gypsy note'",
+                    "Used in klezmer music",
+                    "Gives you Dorian with extra drama"
+                ],
+                commonUses: ["Eastern European folk", "Klezmer", "Film scores"]
+            },
+            {
+                name: "Jewish",
+                altName: "Ahava Rabbah",
+                category: "World/Exotic",
+                intervals: [0, 1, 4, 5, 7, 8, 10],
+                mood: "Middle Eastern, Jewish liturgical, soulful, yearning",
+                description: "Same as Phrygian Dominant. Called 'Ahava Rabbah' or 'Freygish' in Jewish music. The sound of klezmer and Jewish liturgical music.",
+                funFacts: [
+                    "Means 'great love' in Hebrew",
+                    "Used in Jewish prayer and celebration",
+                    "'Hava Nagila' is in this scale",
+                    "The quintessential klezmer sound"
+                ],
+                commonUses: ["Jewish liturgical", "Klezmer", "World music"]
+            },
+            {
+                name: "Balinese",
+                category: "World/Exotic",
+                intervals: [0, 1, 3, 7, 8],
+                mood: "Gamelan, Indonesian, metallic, exotic",
+                description: "A pentatonic scale from Bali, used in gamelan music. The half steps create a distinctive 'metallic' quality.",
+                funFacts: [
+                    "Used in Balinese gamelan orchestras",
+                    "Creates a shimmering, metallic texture",
+                    "Influenced Debussy and other impressionists",
+                    "Very different from Western pentatonics"
+                ],
+                commonUses: ["Balinese gamelan", "World fusion", "Ambient"]
+            },
+            {
+                name: "Chinese",
+                category: "World/Exotic",
+                intervals: [0, 4, 6, 7, 11],
+                mood: "Asian, ancient, mystical, pentatonic",
+                description: "A pentatonic scale associated with Chinese music. The large gaps create an ancient, mystical sound.",
+                funFacts: [
+                    "Based on traditional Chinese tuning",
+                    "Used in Chinese opera and folk music",
+                    "The Hollywood 'Asian' sound",
+                    "Creates 'ancient' atmosphere"
+                ],
+                commonUses: ["Chinese traditional", "Film scores", "World music"]
+            },
+            {
+                name: "Prometheus",
+                category: "World/Exotic",
+                intervals: [0, 2, 4, 6, 9, 10],
+                mood: "Mystical, Scriabin, atonal-adjacent, ethereal",
+                description: "A six-note synthetic scale created by Alexander Scriabin for his 'Prometheus' symphony. Very unusual, very mystical.",
+                funFacts: [
+                    "Created by composer Alexander Scriabin",
+                    "Used in his 'Poem of Fire' (Prometheus)",
+                    "Scriabin associated it with specific colors",
+                    "Missing the 5th - creates instability"
+                ],
+                commonUses: ["Late Romantic classical", "Avant-garde", "Film scores"]
+            },
+            {
+                name: "Tritone",
+                altName: "Petrushka Chord",
+                category: "World/Exotic",
+                intervals: [0, 1, 4, 6, 7, 10],
+                mood: "Bitonal, dissonant, Stravinsky, jarring",
+                description: "Two major triads a tritone apart. Used by Stravinsky in Petrushka. Very dissonant, very modern.",
+                funFacts: [
+                    "Used famously in Stravinsky's 'Petrushka'",
+                    "Creates polytonal effects",
+                    "Maximum dissonance from two major chords",
+                    "Essential for early 20th century modernism"
+                ],
+                commonUses: ["Modern classical", "Film scores", "Avant-garde jazz"]
+            },
+            {
+                name: "Enigmatic",
+                category: "World/Exotic",
+                intervals: [0, 1, 4, 6, 8, 10, 11],
+                mood: "Mysterious, unresolved, strange, enigmatic",
+                description: "An artificial scale created by Verdi. Very unusual intervals create a truly 'enigmatic' quality - hard to find a tonal center.",
+                funFacts: [
+                    "Created by Giuseppe Verdi in 1888",
+                    "Deliberately avoids conventional harmony",
+                    "Used in Joe Satriani's music",
+                    "Nearly impossible to establish a key center"
+                ],
+                commonUses: ["Modern classical", "Progressive rock", "Film scores"]
+            },
+            {
+                name: "Leading Whole Tone",
+                category: "World/Exotic",
+                intervals: [0, 2, 4, 6, 8, 10, 11],
+                mood: "Whole tone with resolution, dreamy but directed",
+                description: "Whole tone scale with an added leading tone (major 7th). Gives the floating whole tone sound a direction to resolve.",
+                funFacts: [
+                    "Whole tone + one note changes everything",
+                    "Creates a 'resolving' whole tone sound",
+                    "Used in impressionist music",
+                    "Good for dominant chords that resolve"
+                ],
+                commonUses: ["Jazz", "Impressionist", "Film scores"]
+            },
+            {
+                name: "Eight Tone Spanish",
+                category: "World/Exotic",
+                intervals: [0, 1, 3, 4, 5, 6, 8, 10],
+                mood: "Spanish, chromatic, flamenco-jazz fusion",
+                description: "An eight-note scale that combines elements of Phrygian with chromatic passing tones. Very Spanish, very chromatic.",
+                funFacts: [
+                    "Combines Spanish flavor with jazz chromaticism",
+                    "Great for jazz/flamenco fusion",
+                    "Contains both b3 and natural 3",
+                    "Chick Corea territory"
+                ],
+                commonUses: ["Jazz", "Flamenco fusion", "Latin jazz"]
+            },
+            {
+                name: "Hungarian Major",
+                category: "World/Exotic",
+                intervals: [0, 3, 4, 6, 7, 9, 10],
+                mood: "Bright gypsy, exotic major, Eastern European festive",
+                description: "A major-sounding scale with #2 and #4. Bright and exotic - the 'happy' Hungarian scale compared to Hungarian Minor.",
+                funFacts: [
+                    "The 'major' version of the gypsy sound",
+                    "Has a celebratory, festive quality",
+                    "Less common than Hungarian Minor",
+                    "Creates unexpected brightness"
+                ],
+                commonUses: ["Eastern European folk", "Klezmer", "Film scores"]
+            },
+            {
+                name: "Locrian Natural 2",
+                altName: "Half Diminished",
+                category: "Dominant/Jazz",
+                intervals: [0, 2, 3, 5, 6, 8, 10],
+                mood: "Less dissonant Locrian, half-diminished, usable darkness",
+                description: "Sixth mode of melodic minor. Locrian but with a natural 2nd - makes it slightly more usable while keeping the diminished flavor.",
+                funFacts: [
+                    "THE scale for half-diminished (m7b5) chords",
+                    "Much more usable than regular Locrian",
+                    "That natural 2 makes all the difference",
+                    "Essential for minor ii-V-i progressions"
+                ],
+                commonUses: ["Jazz", "Film scores", "Modern classical"]
+            },
+            {
+                name: "Acoustic",
+                altName: "Lydian Dominant",
+                category: "Dominant/Jazz",
+                intervals: [0, 2, 4, 6, 7, 9, 10],
+                mood: "Natural, overtone series, bright dominant",
+                description: "Also known as Lydian Dominant or Overtone Scale. Based on the natural overtone series - it's what you'd get from harmonics.",
+                funFacts: [
+                    "Derived from the natural overtone series",
+                    "Appears naturally in brass instruments",
+                    "Used by Bartok extensively",
+                    "Sometimes called 'Lydian b7'"
+                ],
+                commonUses: ["Jazz", "Folk", "Modern classical", "Fusion"]
+            }
+        ];
+
+        // ============================================
+        // CONSTANTS
+        // ============================================
+        const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const FIRST_NOTE = 21; // A0
+        const LAST_NOTE = 108; // C8
+
+        // ============================================
+        // STATE
+        // ============================================
+        let selectedScale = null;
+        let selectedRoot = 0; // C
+        const activeNotes = new Set();
+        let sampler = null;
+        let audioStarted = false;
+        let midiConnected = false;
+
+        // ============================================
+        // AUDIO SETUP
+        // ============================================
+        function initAudio() {
+            sampler = new Tone.Sampler({
+                urls: {
+                    "C4": "C4.mp3",
+                    "D#4": "Ds4.mp3",
+                    "F#4": "Fs4.mp3",
+                    "A4": "A4.mp3",
+                    "C5": "C5.mp3",
+                    "D#5": "Ds5.mp3",
+                    "F#5": "Fs5.mp3",
+                    "A5": "A5.mp3",
+                },
+                release: 1,
+                baseUrl: "https://tonejs.github.io/audio/salamander/",
+            }).toDestination();
+        }
+
+        async function startAudioContext() {
+            if (!audioStarted) {
+                await Tone.start();
+                audioStarted = true;
+                console.log('Audio context started');
+            }
+        }
+
+        function playNote(midi) {
+            if (sampler && sampler.loaded) {
+                const noteName = midiToToneName(midi);
+                sampler.triggerAttack(noteName);
+            }
+        }
+
+        function releaseNote(midi) {
+            if (sampler && sampler.loaded) {
+                const noteName = midiToToneName(midi);
+                sampler.triggerRelease(noteName);
+            }
+        }
+
+        function midiToToneName(midi) {
+            const octave = Math.floor(midi / 12) - 1;
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const note = noteNames[midi % 12];
+            return `${note}${octave}`;
+        }
+
+        // ============================================
+        // DOM ELEMENTS
+        // ============================================
+        const piano = document.getElementById('piano');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const deviceName = document.getElementById('deviceName');
+        const scaleList = document.getElementById('scaleList');
+        const scaleSearch = document.getElementById('scaleSearch');
+        const scaleInfo = document.getElementById('scaleInfo');
+        const rootButtons = document.getElementById('rootButtons');
+        const playingNotes = document.getElementById('playingNotes');
+        const errorContainer = document.getElementById('errorContainer');
+
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        function midiToNoteName(midi) {
+            const octave = Math.floor(midi / 12) - 1;
+            const note = NOTE_NAMES[midi % 12];
+            return `${note}${octave}`;
+        }
+
+        function isBlackKey(midi) {
+            const note = midi % 12;
+            return [1, 3, 6, 8, 10].includes(note);
+        }
+
+        function getScaleNotes(scale, root) {
+            return scale.intervals.map(interval => (root + interval) % 12);
+        }
+
+        function isNoteInScale(midi, scale, root) {
+            if (!scale) return false;
+            const scaleNotes = getScaleNotes(scale, root);
+            // Highlight one octave PLUS the resolving root note at the top
+            const octaveStart = 60 + root; // Start from middle C transposed to the root
+            const octaveEnd = octaveStart + 13; // +13 to include the octave note
+            // The octave note (root + 12) should also light up
+            const noteInOctave = midi >= octaveStart && midi < octaveEnd;
+            const isScaleNote = scaleNotes.includes(midi % 12);
+            return noteInOctave && isScaleNote;
+        }
+
+        // ============================================
+        // PIANO BUILDING
+        // ============================================
+        function buildPiano() {
+            let whiteKeyIndex = 0;
+            const whiteKeyWidth = 32;
+            
+            for (let midi = FIRST_NOTE; midi <= LAST_NOTE; midi++) {
+                if (!isBlackKey(midi)) {
+                    const key = document.createElement('div');
+                    key.className = 'key white';
+                    key.dataset.midi = midi;
+                    key.dataset.note = midiToNoteName(midi);
+                    addKeyListeners(key, midi);
+                    piano.appendChild(key);
+                    whiteKeyIndex++;
+                }
+            }
+
+            whiteKeyIndex = 0;
+            for (let midi = FIRST_NOTE; midi <= LAST_NOTE; midi++) {
+                if (!isBlackKey(midi)) {
+                    whiteKeyIndex++;
+                } else {
+                    const key = document.createElement('div');
+                    key.className = 'key black';
+                    key.dataset.midi = midi;
+                    key.dataset.note = midiToNoteName(midi);
+                    const leftOffset = (whiteKeyIndex * whiteKeyWidth) - 11;
+                    key.style.left = `${leftOffset}px`;
+                    addKeyListeners(key, midi);
+                    piano.appendChild(key);
+                }
+            }
+        }
+
+        function addKeyListeners(key, midi) {
+            // Mouse events
+            key.addEventListener('mousedown', async (e) => {
+                e.preventDefault();
+                await startAudioContext();
+                if (!midiConnected) {
+                    activateKey(midi);
+                    playNote(midi);
+                }
+            });
+            
+            key.addEventListener('mouseup', () => {
+                if (!midiConnected) {
+                    deactivateKey(midi);
+                    releaseNote(midi);
+                }
+            });
+            
+            key.addEventListener('mouseleave', () => {
+                if (!midiConnected && activeNotes.has(midi)) {
+                    deactivateKey(midi);
+                    releaseNote(midi);
+                }
+            });
+
+            // Touch events for mobile
+            key.addEventListener('touchstart', async (e) => {
+                e.preventDefault();
+                await startAudioContext();
+                if (!midiConnected) {
+                    activateKey(midi);
+                    playNote(midi);
+                }
+            });
+            
+            key.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (!midiConnected) {
+                    deactivateKey(midi);
+                    releaseNote(midi);
+                }
+            });
+        }
+
+        function activateKey(midi) {
+            activeNotes.add(midi);
+            const keyEl = piano.querySelector(`[data-midi="${midi}"]`);
+            if (keyEl) keyEl.classList.add('active');
+            updatePlayingDisplay();
+        }
+
+        function deactivateKey(midi) {
+            activeNotes.delete(midi);
+            const keyEl = piano.querySelector(`[data-midi="${midi}"]`);
+            if (keyEl) keyEl.classList.remove('active');
+            updatePlayingDisplay();
+        }
+
+        function updatePianoHighlights() {
+            document.querySelectorAll('.key').forEach(key => {
+                const midi = parseInt(key.dataset.midi);
+                key.classList.remove('target');
+                
+                if (isNoteInScale(midi, selectedScale, selectedRoot)) {
+                    key.classList.add('target');
+                }
+            });
+            
+            // Auto-scroll to center on the highlighted scale
+            if (selectedScale) {
+                const targetMidi = 60 + selectedRoot + 6; // Center of the highlighted octave
+                const targetKey = piano.querySelector(`[data-midi="${targetMidi}"]`);
+                if (targetKey) {
+                    const wrapper = document.querySelector('.piano-wrapper');
+                    const keyRect = targetKey.getBoundingClientRect();
+                    const wrapperRect = wrapper.getBoundingClientRect();
+                    const scrollTarget = targetKey.offsetLeft - (wrapperRect.width / 2) + (keyRect.width / 2);
+                    wrapper.scrollTo({ left: scrollTarget, behavior: 'smooth' });
+                }
+            }
+        }
+
+        // ============================================
+        // SCALE BROWSER
+        // ============================================
+        function buildScaleBrowser(filter = '') {
+            const categories = {};
+            
+            SCALES.forEach(scale => {
+                if (!categories[scale.category]) {
+                    categories[scale.category] = [];
+                }
+                categories[scale.category].push(scale);
+            });
+
+            scaleList.innerHTML = '';
+
+            const categoryOrder = [
+                'Major Modes', 'Minor Variants', 'Pentatonic', 'Blues', 
+                'Symmetric', 'Dominant/Jazz', 'Bebop', 'World/Exotic'
+            ];
+
+            categoryOrder.forEach(category => {
+                if (!categories[category]) return;
+                
+                const scales = categories[category].filter(scale => {
+                    const searchTerm = filter.toLowerCase();
+                    return scale.name.toLowerCase().includes(searchTerm) ||
+                           (scale.altName && scale.altName.toLowerCase().includes(searchTerm)) ||
+                           scale.category.toLowerCase().includes(searchTerm) ||
+                           scale.mood.toLowerCase().includes(searchTerm);
+                });
+
+                if (scales.length === 0) return;
+
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'scale-category';
+
+                const header = document.createElement('div');
+                header.className = 'category-header';
+                header.innerHTML = `<span class="arrow">▼</span> ${category} (${scales.length})`;
+                header.onclick = () => {
+                    header.classList.toggle('collapsed');
+                    scalesDiv.classList.toggle('hidden');
+                };
+
+                const scalesDiv = document.createElement('div');
+                scalesDiv.className = 'category-scales';
+
+                scales.forEach(scale => {
+                    const item = document.createElement('div');
+                    item.className = 'scale-item';
+                    if (selectedScale && selectedScale.name === scale.name) {
+                        item.classList.add('active');
+                    }
+                    item.innerHTML = `
+                        <span>${scale.name}${scale.altName ? ` <span style="opacity:0.6; font-size:0.7rem">(${scale.altName})</span>` : ''}</span>
+                        <span class="note-count">${scale.intervals.length}</span>
+                    `;
+                    item.onclick = () => selectScale(scale);
+                    scalesDiv.appendChild(item);
+                });
+
+                categoryDiv.appendChild(header);
+                categoryDiv.appendChild(scalesDiv);
+                scaleList.appendChild(categoryDiv);
+            });
+        }
+
+        // ============================================
+        // ROOT NOTE SELECTOR
+        // ============================================
+        function buildRootSelector() {
+            NOTE_NAMES.forEach((note, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'root-btn' + (index === selectedRoot ? ' active' : '');
+                btn.textContent = note;
+                btn.onclick = () => {
+                    selectedRoot = index;
+                    document.querySelectorAll('.root-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updatePianoHighlights();
+                    if (selectedScale) {
+                        updateScaleInfo();
+                    }
+                };
+                rootButtons.appendChild(btn);
+            });
+        }
+
+        // ============================================
+        // SCALE INFO DISPLAY
+        // ============================================
+        function selectScale(scale) {
+            selectedScale = scale;
+            buildScaleBrowser(scaleSearch.value);
+            updatePianoHighlights();
+            updateScaleInfo();
+        }
+
+        function updateScaleInfo() {
+            if (!selectedScale) {
+                scaleInfo.innerHTML = `
+                    <div class="no-scale-selected">
+                        <h3>Select a Scale</h3>
+                        <p>Choose from the library on the left to see details and practice</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const rootName = NOTE_NAMES[selectedRoot];
+            const scaleNotes = getScaleNotes(selectedScale, selectedRoot);
+            const noteNames = scaleNotes.map(n => NOTE_NAMES[n]);
+            // Add the resolving root note at the end
+            noteNames.push(rootName);
+
+            scaleInfo.innerHTML = `
+                <div class="scale-info-header">
+                    <h2 class="scale-title">${rootName} ${selectedScale.name}</h2>
+                    <span class="scale-category-badge">${selectedScale.category}</span>
+                </div>
+                
+                <div class="scale-intervals">
+                    ${noteNames.map(n => `<span class="interval-badge">${n}</span>`).join('')}
+                </div>
+                
+                <div class="scale-mood">
+                    <div class="scale-mood-label">Mood / Character</div>
+                    <div class="scale-mood-text">${selectedScale.mood}</div>
+                </div>
+                
+                <p class="scale-description">${selectedScale.description}</p>
+                
+                <div class="scale-facts">
+                    <div class="scale-facts-label">Fun Facts</div>
+                    ${selectedScale.funFacts.map(fact => `
+                        <div class="fact-item">
+                            <span class="fact-bullet">●</span>
+                            <span>${fact}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="scale-facts-label" style="margin-top: 1rem; margin-bottom: 0.5rem;">Common Uses</div>
+                <div class="scale-uses">
+                    ${selectedScale.commonUses.map(use => `<span class="use-tag">${use}</span>`).join('')}
+                </div>
+            `;
+        }
+
+        // ============================================
+        // MIDI HANDLING
+        // ============================================
+        function updatePlayingDisplay() {
+            if (activeNotes.size === 0) {
+                playingNotes.textContent = '—';
+            } else {
+                const sortedNotes = Array.from(activeNotes).sort((a, b) => a - b);
+                playingNotes.innerHTML = sortedNotes
+                    .slice(0, 8)
+                    .map(midi => `<span class="note-badge">${midiToNoteName(midi)}</span>`)
+                    .join('');
+                if (sortedNotes.length > 8) {
+                    playingNotes.innerHTML += `<span style="color: var(--text-dim)">+${sortedNotes.length - 8}</span>`;
+                }
+            }
+        }
+
+        function onMIDIMessage(event) {
+            const [status, note, velocity] = event.data;
+            
+            const isNoteOn = (status >= 144 && status <= 159) && velocity > 0;
+            const isNoteOff = (status >= 128 && status <= 143) || 
+                             ((status >= 144 && status <= 159) && velocity === 0);
+
+            if (isNoteOn) {
+                activateKey(note);
+                // Don't play sound for MIDI - the keyboard itself makes sound
+            } else if (isNoteOff) {
+                deactivateKey(note);
+            }
+        }
+
+        function onMIDISuccess(midiAccess) {
+            const inputs = midiAccess.inputs.values();
+            let connected = false;
+
+            for (let input of inputs) {
+                input.onmidimessage = onMIDIMessage;
+                
+                if (!connected) {
+                    statusDot.classList.add('connected');
+                    statusText.textContent = 'Connected';
+                    deviceName.textContent = input.name || 'Unknown device';
+                    connected = true;
+                    midiConnected = true;
+                }
+            }
+
+            if (!connected) {
+                statusText.textContent = 'No devices';
+                deviceName.textContent = 'Click keys to play';
+                midiConnected = false;
+            }
+
+            midiAccess.onstatechange = (e) => {
+                if (e.port.state === 'connected' && e.port.type === 'input') {
+                    e.port.onmidimessage = onMIDIMessage;
+                    statusDot.classList.add('connected');
+                    statusText.textContent = 'Connected';
+                    deviceName.textContent = e.port.name || 'Unknown device';
+                    midiConnected = true;
+                } else if (e.port.state === 'disconnected' && e.port.type === 'input') {
+                    statusDot.classList.remove('connected');
+                    statusText.textContent = 'Disconnected';
+                    deviceName.textContent = 'Click keys to play';
+                    midiConnected = false;
+                    activeNotes.clear();
+                    updatePlayingDisplay();
+                    document.querySelectorAll('.key.active').forEach(k => k.classList.remove('active'));
+                }
+            };
+        }
+
+        function onMIDIFailure(error) {
+            // MIDI failed but that's okay - clicks will still work
+            statusText.textContent = 'No MIDI';
+            deviceName.textContent = 'Click keys to play';
+            midiConnected = false;
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            buildPiano();
+            buildRootSelector();
+            buildScaleBrowser();
+            updateScaleInfo();
+            initAudio();
+
+            scaleSearch.addEventListener('input', (e) => {
+                buildScaleBrowser(e.target.value);
+            });
+
+            if (navigator.requestMIDIAccess) {
+                navigator.requestMIDIAccess({ sysex: false })
+                    .then(onMIDISuccess)
+                    .catch(onMIDIFailure);
+            } else {
+                // No MIDI support - that's fine, clicks will work
+                statusText.textContent = 'No MIDI';
+                deviceName.textContent = 'Click keys to play';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

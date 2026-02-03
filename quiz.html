@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scale Quiz | Scale Trainer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-deep: #0a0a0b;
+            --bg-surface: #131315;
+            --bg-elevated: #1a1a1d;
+            --bg-hover: #222226;
+            --text-primary: #e8e6e3;
+            --text-muted: #6b6b6f;
+            --text-dim: #4a4a4d;
+            --accent: #c4f761;
+            --accent-dim: #a3d44e;
+            --target: #61b3f7;
+            --target-dim: #4a9cd8;
+            --error: #ff6b6b;
+            --success: #4ade80;
+            --white-key: #f5f5f0;
+            --black-key: #1a1a1d;
+            --key-shadow: rgba(0,0,0,0.4);
+            --border-subtle: rgba(255,255,255,0.06);
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .header-left { display: flex; align-items: center; gap: 1.5rem; }
+
+        .logo {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.75rem;
+            font-weight: 400;
+            letter-spacing: -0.02em;
+        }
+        .logo span { color: var(--accent); }
+
+        .back-link {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            transition: all 0.15s;
+        }
+        .back-link:hover {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+        }
+
+        .status-container { text-align: right; }
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error);
+            transition: background 0.3s ease;
+        }
+        .status-dot.connected {
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent);
+        }
+
+        .device-name {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            opacity: 0.7;
+        }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .toggle-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+
+        .toggle-switch {
+            display: flex;
+            background: var(--bg-elevated);
+            border-radius: 6px;
+            padding: 3px;
+            gap: 3px;
+        }
+
+        .toggle-option {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.75rem;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+
+        .toggle-option.active {
+            background: var(--accent);
+            color: var(--bg-deep);
+        }
+
+        /* Progress Section */
+        .progress-section {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .progress-category {
+            font-size: 0.8rem;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .progress-overall {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        .progress-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-count {
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            white-space: nowrap;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* Navigation Arrows */
+        .nav-arrows {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .nav-arrow {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-arrow:hover:not(:disabled) {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-arrow:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-arrow-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Quiz Card */
+        .quiz-card {
+            background: var(--bg-surface);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .scale-header {
+            text-align: center;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .scale-name {
+            font-family: 'Instrument Serif', serif;
+            font-size: 2.25rem;
+            font-weight: 400;
+            margin-bottom: 0.25rem;
+        }
+
+        .scale-category-badge {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+        }
+
+        /* Scale Theory Info */
+        .scale-theory {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .theory-item {
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+        }
+
+        .theory-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 0.35rem;
+        }
+
+        .theory-value {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+
+        .theory-value.degrees {
+            color: var(--target);
+        }
+
+        .theory-value.parent {
+            color: var(--accent);
+            font-size: 0.8rem;
+        }
+
+        /* Mood & Fun Fact */
+        .scale-mood {
+            background: var(--bg-elevated);
+            border-left: 3px solid var(--accent);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .mood-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 0.25rem;
+        }
+
+        .mood-text {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            font-style: italic;
+        }
+
+        .fun-fact {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .fun-fact-icon {
+            color: var(--accent);
+            font-size: 0.7rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Hint Section */
+        .hint-section {
+            text-align: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .hint-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .hint-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .hint-notes {
+            display: none;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            justify-content: center;
+            margin-top: 0.75rem;
+        }
+        .hint-notes.visible { display: flex; }
+
+        .hint-note {
+            background: var(--target);
+            color: var(--bg-deep);
+            padding: 0.3rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        /* Note Progress */
+        .note-progress {
+            display: flex;
+            gap: 0.4rem;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+        }
+
+        .note-slot {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            background: var(--bg-elevated);
+            border: 2px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            transition: all 0.15s;
+        }
+
+        .note-slot.current {
+            border-color: var(--target);
+            color: var(--target);
+            box-shadow: 0 0 12px rgba(97, 179, 247, 0.3);
+        }
+
+        .note-slot.completed {
+            background: var(--success);
+            border-color: var(--success);
+            color: var(--bg-deep);
+        }
+
+        .note-slot.wrong {
+            background: var(--error);
+            border-color: var(--error);
+            color: white;
+            animation: shake 0.3s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        /* Reset indicator */
+        .reset-message {
+            text-align: center;
+            color: var(--error);
+            font-size: 0.8rem;
+            padding: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .reset-message.visible {
+            opacity: 1;
+        }
+
+        /* Success State */
+        .success-message {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+        }
+        .success-message.visible { display: flex; }
+
+        .success-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            animation: pop 0.3s ease;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0); }
+            80% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .success-text {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.25rem;
+            color: var(--success);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        .action-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: none;
+        }
+
+        .action-btn.primary {
+            background: var(--accent);
+            color: var(--bg-deep);
+        }
+        .action-btn.primary:hover {
+            background: var(--accent-dim);
+        }
+
+        .action-btn.secondary {
+            background: var(--bg-elevated);
+            color: var(--text-muted);
+            border: 1px solid var(--border-subtle);
+        }
+        .action-btn.secondary:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Piano Section */
+        .piano-section {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border-subtle);
+            overflow: hidden;
+        }
+
+        .piano-wrapper { 
+            overflow-x: auto; 
+            padding: 0.5rem 0;
+            width: 100%;
+        }
+
+        .piano {
+            display: flex;
+            position: relative;
+            height: 130px;
+            width: fit-content;
+            margin: 0 auto;
+        }
+
+        .key { 
+            position: relative; 
+            cursor: pointer; 
+            transition: all 0.08s ease-out;
+            user-select: none;
+        }
+
+        .key.white {
+            width: 26px;
+            height: 130px;
+            background: linear-gradient(180deg, var(--white-key) 0%, #e8e8e3 100%);
+            border: 1px solid #d0d0c8;
+            border-radius: 0 0 4px 4px;
+            z-index: 1;
+            box-shadow: 0 4px 8px var(--key-shadow), inset 0 -4px 8px rgba(0,0,0,0.05);
+        }
+        .key.white.target { background: linear-gradient(180deg, #b8d4f0 0%, #9ec5e8 100%); border-color: var(--target); }
+        .key.white.active {
+            background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%);
+            box-shadow: 0 2px 4px var(--key-shadow), 0 0 20px rgba(196, 247, 97, 0.3);
+            transform: translateY(2px);
+        }
+        .key.white.completed {
+            background: linear-gradient(180deg, #86efac 0%, #4ade80 100%);
+            border-color: var(--success);
+        }
+
+        .key.black {
+            width: 18px;
+            height: 85px;
+            background: linear-gradient(180deg, #2a2a2d 0%, var(--black-key) 100%);
+            border-radius: 0 0 3px 3px;
+            position: absolute;
+            z-index: 2;
+            box-shadow: 0 4px 8px var(--key-shadow), inset 0 -2px 4px rgba(255,255,255,0.05);
+        }
+        .key.black.target { background: linear-gradient(180deg, var(--target-dim) 0%, #3d7aa8 100%); }
+        .key.black.active {
+            background: linear-gradient(180deg, var(--accent-dim) 0%, #8ab840 100%);
+            box-shadow: 0 2px 4px var(--key-shadow), 0 0 15px rgba(196, 247, 97, 0.4);
+            height: 83px;
+        }
+        .key.black.completed {
+            background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+        }
+
+        .legend {
+            display: flex;
+            gap: 1.25rem;
+            justify-content: center;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-subtle);
+            margin-top: 0.75rem;
+        }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.65rem; color: var(--text-muted); }
+        .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+        .legend-swatch.target { background: var(--target); }
+        .legend-swatch.played { background: var(--accent); }
+        .legend-swatch.completed { background: var(--success); }
+
+        /* Category Complete */
+        .category-complete {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        .category-complete.visible { display: block; }
+
+        .category-complete-icon {
+            font-size: 3rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .category-complete-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin-bottom: 0.25rem;
+        }
+
+        .category-complete-sub {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Completion Screen */
+        .completion-screen {
+            display: none;
+            text-align: center;
+            padding: 3rem;
+        }
+        .completion-screen.visible { display: block; }
+
+        .completion-icon { font-size: 4rem; margin-bottom: 1rem; }
+
+        .completion-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: 2.5rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .completion-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-surface); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+
+        /* Watermark */
+        .watermark {
+            text-align: center;
+            padding: 2rem 0 1rem 0;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 0.05em;
+        }
+
+        /* Error state */
+        .error-message {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+        }
+        .error-message h3 {
+            color: var(--error);
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .error-message p { color: var(--text-muted); font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <h1 class="logo">Scale<span>.</span>Quiz</h1>
+                <a href="index.html" class="back-link">← Back to Trainer</a>
+            </div>
+            <div class="status-container">
+                <div class="connection-status">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Disconnected</span>
+                </div>
+                <div class="device-name" id="deviceName">No device</div>
+            </div>
+        </header>
+
+        <div id="errorContainer"></div>
+
+        <div id="quizContent">
+            <div class="mode-toggle">
+                <span class="toggle-label">Mode:</span>
+                <div class="toggle-switch">
+                    <button class="toggle-option active" id="structuredBtn">Structured</button>
+                    <button class="toggle-option" id="randomBtn">Random</button>
+                </div>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-header">
+                    <span class="progress-category" id="progressCategory">Major Modes</span>
+                    <span class="progress-overall" id="progressOverall">Overall: 0/51</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                    <span class="progress-count" id="progressCount">0 / 7</span>
+                </div>
+            </div>
+
+            <div class="quiz-card" id="quizCard">
+                <div class="nav-arrows">
+                    <button class="nav-arrow" id="prevArrow">
+                        <span>←</span>
+                        <span class="nav-arrow-label">Prev</span>
+                    </button>
+                    <button class="nav-arrow" id="nextArrow">
+                        <span class="nav-arrow-label">Next</span>
+                        <span>→</span>
+                    </button>
+                </div>
+
+                <div class="scale-header">
+                    <div class="scale-name" id="scaleName">C Ionian</div>
+                    <div class="scale-category-badge" id="scaleCategoryBadge">Major Modes</div>
+                </div>
+
+                <div class="scale-theory" id="scaleTheory">
+                    <div class="theory-item">
+                        <div class="theory-label">Step Pattern</div>
+                        <div class="theory-value" id="stepPattern">W-W-H-W-W-W-H</div>
+                    </div>
+                    <div class="theory-item">
+                        <div class="theory-label">Scale Degrees</div>
+                        <div class="theory-value degrees" id="scaleDegrees">1 2 3 4 5 6 7</div>
+                    </div>
+                    <div class="theory-item" id="parentScaleItem" style="display: none;">
+                        <div class="theory-label">Parent Scale</div>
+                        <div class="theory-value parent" id="parentScale"></div>
+                    </div>
+                </div>
+
+                <div class="scale-mood">
+                    <div class="mood-label">Mood / Character</div>
+                    <div class="mood-text" id="moodText">Bright, happy, resolved, triumphant</div>
+                </div>
+
+                <div class="fun-fact" id="funFact">
+                    <span class="fun-fact-icon">★</span>
+                    <span id="funFactText">The 'Do Re Mi' scale from Sound of Music</span>
+                </div>
+
+                <div class="hint-section">
+                    <button class="hint-btn" id="hintBtn">Show Notes</button>
+                    <div class="hint-notes" id="hintNotes"></div>
+                </div>
+
+                <div class="note-progress" id="noteProgress"></div>
+
+                <div class="success-message" id="successMessage">
+                    <div class="success-icon">✓</div>
+                    <div class="success-text">Perfect!</div>
+                    <div class="action-buttons">
+                        <button class="action-btn secondary" id="retryBtn">Practice Again</button>
+                        <button class="action-btn primary" id="nextBtn">Next Scale →</button>
+                    </div>
+                </div>
+
+                <div class="category-complete" id="categoryComplete">
+                    <div class="category-complete-icon">🎯</div>
+                    <div class="category-complete-title" id="categoryCompleteTitle">Major Modes Complete!</div>
+                    <div class="category-complete-sub" id="categoryCompleteSub">You've mastered all 7 modes. Ready for the next category?</div>
+                    <button class="action-btn primary" id="nextCategoryBtn">Continue to Next Category →</button>
+                </div>
+            </div>
+
+            <div class="piano-section" id="pianoSection">
+                <div class="piano-wrapper">
+                    <div class="piano" id="piano"></div>
+                </div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-swatch target"></div><span>Next note</span></div>
+                    <div class="legend-item"><div class="legend-swatch played"></div><span>Playing</span></div>
+                    <div class="legend-item"><div class="legend-swatch completed"></div><span>Completed</span></div>
+                </div>
+            </div>
+
+            <div class="completion-screen" id="completionScreen">
+                <div class="completion-icon">🎉</div>
+                <div class="completion-title">All Scales Complete!</div>
+                <div class="completion-subtitle">You've mastered all 51 scales. Incredible work!</div>
+                <button class="action-btn primary" id="restartBtn">Start Over</button>
+            </div>
+        </div>
+
+        <footer class="watermark">Remikun Arbitrage 🄯 Copyleft 2026</footer>
+    </div>
+
+    <script>
+        // ============================================
+        // SCALE DATABASE WITH THEORY INFO
+        // ============================================
+        const SCALES = [
+            // === MAJOR MODES ===
+            { name: "Ionian", altName: "Major Scale", category: "Major Modes", intervals: [0, 2, 4, 5, 7, 9, 11], 
+              mood: "Bright, happy, resolved, triumphant",
+              parent: "1st mode of Major scale (it IS the major scale)",
+              funFacts: ["The 'Do Re Mi' scale from Sound of Music", "Foundation of Western harmony", "Used in virtually every pop chorus"] },
+            { name: "Dorian", category: "Major Modes", intervals: [0, 2, 3, 5, 7, 9, 10],
+              mood: "Minor but hopeful, sophisticated, jazzy",
+              parent: "2nd mode of Major scale",
+              funFacts: ["Miles Davis's 'So What' is entirely Dorian", "Santana's signature sound", "The Simpsons theme uses this"] },
+            { name: "Phrygian", category: "Major Modes", intervals: [0, 1, 3, 5, 7, 8, 10],
+              mood: "Dark, exotic, Spanish, mysterious",
+              parent: "3rd mode of Major scale",
+              funFacts: ["The 'flamenco' sound in a nutshell", "Metallica uses this for heavy riffs", "Named after ancient Phrygia (Turkey)"] },
+            { name: "Lydian", category: "Major Modes", intervals: [0, 2, 4, 6, 7, 9, 11],
+              mood: "Dreamy, floating, ethereal, magical",
+              parent: "4th mode of Major scale",
+              funFacts: ["John Williams uses this for 'wonder' moments", "Steve Vai's signature sound", "The Simpsons theme opening"] },
+            { name: "Mixolydian", category: "Major Modes", intervals: [0, 2, 4, 5, 7, 9, 10],
+              mood: "Bluesy, laid-back, classic rock",
+              parent: "5th mode of Major scale (the dominant)",
+              funFacts: ["The Beatles used this constantly", "AC/DC lives in Mixolydian", "The Grateful Dead's jam sound"] },
+            { name: "Aeolian", altName: "Natural Minor", category: "Major Modes", intervals: [0, 2, 3, 5, 7, 8, 10],
+              mood: "Sad, dark, serious, melancholic",
+              parent: "6th mode of Major scale",
+              funFacts: ["THE natural minor scale", "R.E.M.'s 'Losing My Religion'", "Most minor key pop songs use this"] },
+            { name: "Locrian", category: "Major Modes", intervals: [0, 1, 3, 5, 6, 8, 10],
+              mood: "Unstable, dissonant, dark, evil",
+              parent: "7th mode of Major scale",
+              funFacts: ["The 'forbidden' mode - rarely used as key center", "Has a diminished 5th (tritone)", "Used in metal for maximum darkness"] },
+
+            // === MINOR VARIANTS ===
+            { name: "Harmonic Minor", category: "Minor Variants", intervals: [0, 2, 3, 5, 7, 8, 11],
+              mood: "Classical, exotic, dramatic, neoclassical",
+              parent: "Natural minor with raised 7th",
+              funFacts: ["Yngwie Malmsteen's bread and butter", "That 'Phantom of the Opera' sound", "Creates the V7 chord in minor keys"] },
+            { name: "Melodic Minor", altName: "Jazz Minor", category: "Minor Variants", intervals: [0, 2, 3, 5, 7, 9, 11],
+              mood: "Sophisticated, jazzy, smooth, modern",
+              parent: "Natural minor with raised 6th and 7th",
+              funFacts: ["Parent of the Altered scale", "Jazz musicians use it ascending AND descending", "Dorian with a major 7th"] },
+            { name: "Dorian b2", altName: "Phrygian #6", category: "Minor Variants", intervals: [0, 1, 3, 5, 7, 9, 10],
+              mood: "Exotic, tense, mysterious",
+              parent: "2nd mode of Melodic Minor",
+              funFacts: ["Used in Klezmer music", "Phrygian darkness with Dorian hope", "Favorite in progressive metal"] },
+            { name: "Hungarian Minor", category: "Minor Variants", intervals: [0, 2, 3, 6, 7, 8, 11],
+              mood: "Dramatic, Eastern European, gypsy, intense",
+              parent: "Harmonic minor with raised 4th",
+              funFacts: ["Dick Dale's 'Misirlou' (Pulp Fiction)", "Contains TWO augmented 2nds", "Also called 'Gypsy Minor'"] },
+            { name: "Neapolitan Minor", category: "Minor Variants", intervals: [0, 1, 3, 5, 7, 8, 11],
+              mood: "Dark, classical, dramatic, operatic",
+              parent: "Harmonic minor with lowered 2nd",
+              funFacts: ["Named for Neapolitan opera", "Creates the famous bII chord", "Used for tragic scenes"] },
+            { name: "Neapolitan Major", category: "Minor Variants", intervals: [0, 1, 3, 5, 7, 9, 11],
+              mood: "Mysterious, ethereal, otherworldly",
+              parent: "Melodic minor with lowered 2nd",
+              funFacts: ["Brighter than Neapolitan Minor", "Used in Romantic classical", "Creates unique progressions"] },
+
+            // === PENTATONIC ===
+            { name: "Major Pentatonic", category: "Pentatonic", intervals: [0, 2, 4, 7, 9],
+              mood: "Happy, simple, universal, folk",
+              parent: "Major scale minus 4th and 7th",
+              funFacts: ["Bobby McFerrin proved everyone knows this instinctively", "The black keys form a pentatonic", "'Amazing Grace' is pure pentatonic"] },
+            { name: "Minor Pentatonic", category: "Pentatonic", intervals: [0, 3, 5, 7, 10],
+              mood: "Bluesy, rock, soulful, raw",
+              parent: "Natural minor minus 2nd and 6th",
+              funFacts: ["THE rock and blues scale", "You literally cannot sound bad with it", "'Smoke on the Water' riff"] },
+            { name: "Egyptian", altName: "Suspended", category: "Pentatonic", intervals: [0, 2, 5, 7, 10],
+              mood: "Ancient, desert, suspended, ambiguous",
+              parent: "Pentatonic with no 3rd",
+              funFacts: ["Neither major nor minor", "Used in 'Scarborough Fair'", "Common in Chinese music too"] },
+            { name: "Hirajoshi", category: "Pentatonic", intervals: [0, 2, 3, 7, 8],
+              mood: "Japanese, melancholic, beautiful",
+              parent: "Traditional Japanese scale",
+              funFacts: ["Used in koto music", "Metallica's 'Enter Sandman' bridge", "The semitones create the 'Japanese' sound"] },
+            { name: "In Sen", category: "Pentatonic", intervals: [0, 1, 5, 7, 10],
+              mood: "Dark Japanese, mysterious, haunting",
+              parent: "Traditional shakuhachi flute scale",
+              funFacts: ["Darker than Hirajoshi", "Used in Japanese horror", "The b2 creates instant tension"] },
+            { name: "Yo", category: "Pentatonic", intervals: [0, 2, 5, 7, 9],
+              mood: "Bright Japanese, festive, cheerful",
+              parent: "Japanese folk scale",
+              funFacts: ["Used in matsuri (festival) music", "More 'major' sounding", "Common in anime soundtracks"] },
+            { name: "Iwato", category: "Pentatonic", intervals: [0, 1, 5, 6, 10],
+              mood: "Extremely dark, dissonant, ominous",
+              parent: "Darkest Japanese pentatonic",
+              funFacts: ["Contains two tritones", "Named after a mythological cave", "The 'evil' Japanese scale"] },
+            { name: "Kumoi", category: "Pentatonic", intervals: [0, 2, 3, 7, 9],
+              mood: "Bittersweet, nostalgic, wistful",
+              parent: "Japanese court music scale",
+              funFacts: ["Steely Dan used this in 'Aja'", "Minor-ish but with major 6th", "Means 'nine layers' (clouds)"] },
+
+            // === BLUES ===
+            { name: "Blues Scale", altName: "Minor Blues", category: "Blues", intervals: [0, 3, 5, 6, 7, 10],
+              mood: "Gritty, soulful, expressive, raw",
+              parent: "Minor pentatonic + b5 (blue note)",
+              funFacts: ["The b5 is THE blue note", "B.B. King built a career on this", "Works over major AND minor chords"] },
+            { name: "Major Blues", category: "Blues", intervals: [0, 2, 3, 4, 7, 9],
+              mood: "Happy blues, country, upbeat",
+              parent: "Major pentatonic + #2/b3",
+              funFacts: ["The 'country' blues scale", "That b3 to 3 move is classic Allman Brothers", "Mix with minor blues for advanced soloing"] },
+
+            // === SYMMETRIC ===
+            { name: "Whole Tone", category: "Symmetric", intervals: [0, 2, 4, 6, 8, 10],
+              mood: "Dreamy, hazy, floating, impressionistic",
+              parent: "All whole steps - only 2 exist",
+              funFacts: ["Debussy's signature sound", "Stevie Wonder's 'You Are the Sunshine' intro", "Used for dream sequences in cartoons"] },
+            { name: "Diminished H-W", altName: "Octatonic", category: "Symmetric", intervals: [0, 1, 3, 4, 6, 7, 9, 10],
+              mood: "Tense, dark, mysterious, chromatic",
+              parent: "Alternating half-whole steps",
+              funFacts: ["Only 3 diminished scales exist", "Steely Dan's secret weapon", "Use over diminished 7th chords"] },
+            { name: "Diminished W-H", category: "Symmetric", intervals: [0, 2, 3, 5, 6, 8, 9, 11],
+              mood: "Dominant, tense, bluesy-chromatic",
+              parent: "Alternating whole-half steps",
+              funFacts: ["Perfect over 7(b9) chords", "Rimsky-Korsakov loved this", "Same notes as H-W, different start"] },
+            { name: "Chromatic", category: "Symmetric", intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+              mood: "Tense, passing, technical, atonal",
+              parent: "All 12 semitones",
+              funFacts: ["Flight of the Bumblebee", "Bebop players use chromatic passing tones", "Building block of all Western music"] },
+            { name: "Augmented", altName: "Hexatonic", category: "Symmetric", intervals: [0, 3, 4, 7, 8, 11],
+              mood: "Mysterious, unstable, otherworldly",
+              parent: "Two interlocking augmented triads",
+              funFacts: ["Only 4 augmented scales exist", "Coltrane's 'Giant Steps' era", "Very 'outside' sounding"] },
+
+            // === DOMINANT/JAZZ ===
+            { name: "Lydian Dominant", altName: "Lydian b7", category: "Dominant/Jazz", intervals: [0, 2, 4, 6, 7, 9, 10],
+              mood: "Bright dominant, sophisticated, fusion",
+              parent: "4th mode of Melodic Minor",
+              funFacts: ["The Simpsons theme often cited", "Steely Dan loves this", "Perfect for non-resolving dominants"] },
+            { name: "Mixolydian b6", altName: "Hindu Scale", category: "Dominant/Jazz", intervals: [0, 2, 4, 5, 7, 8, 10],
+              mood: "Exotic dominant, Indian, melancholic",
+              parent: "5th mode of Melodic Minor",
+              funFacts: ["Common in Indian classical", "Great for V7 to minor i", "Also called 'Aeolian Dominant'"] },
+            { name: "Altered Scale", altName: "Super Locrian", category: "Dominant/Jazz", intervals: [0, 1, 3, 4, 6, 8, 10],
+              mood: "Maximum tension, outside, dissonant",
+              parent: "7th mode of Melodic Minor",
+              funFacts: ["Contains ALL altered tensions", "Charlie Parker's outside sound", "THE bebop secret weapon"] },
+            { name: "Lydian Augmented", category: "Dominant/Jazz", intervals: [0, 2, 4, 6, 8, 9, 11],
+              mood: "Extremely bright, floating, ethereal",
+              parent: "3rd mode of Melodic Minor",
+              funFacts: ["Wayne Shorter's signature", "Creates maj7(#5#11) chords", "Lydian on steroids"] },
+            { name: "Locrian #2", altName: "Half Diminished", category: "Dominant/Jazz", intervals: [0, 2, 3, 5, 6, 8, 10],
+              mood: "Usable Locrian, half-diminished, dark",
+              parent: "6th mode of Melodic Minor",
+              funFacts: ["THE scale for m7b5 chords", "Much more usable than regular Locrian", "Essential for minor ii-V-i"] },
+
+            // === BEBOP ===
+            { name: "Bebop Dominant", category: "Bebop", intervals: [0, 2, 4, 5, 7, 9, 10, 11],
+              mood: "Swinging, chromatic, flowing, classic jazz",
+              parent: "Mixolydian + major 7th",
+              funFacts: ["8 notes = chord tones on downbeats", "Parker and Dizzy's foundation", "THE bebop sound in one scale"] },
+            { name: "Bebop Major", category: "Bebop", intervals: [0, 2, 4, 5, 7, 8, 9, 11],
+              mood: "Bright, chromatic, swinging",
+              parent: "Major scale + #5",
+              funFacts: ["Use over maj7 or maj6 chords", "Less common than Bebop Dominant", "Creates flowing lines"] },
+            { name: "Bebop Minor", altName: "Bebop Dorian", category: "Bebop", intervals: [0, 2, 3, 4, 5, 7, 9, 10],
+              mood: "Minor, swinging, chromatic, smooth",
+              parent: "Dorian + major 3rd",
+              funFacts: ["That 3-4 chromatic move is essential", "Use over minor 7 chords", "Minor version of Bebop Dominant"] },
+
+            // === WORLD/EXOTIC ===
+            { name: "Phrygian Dominant", altName: "Spanish Gypsy", category: "World/Exotic", intervals: [0, 1, 4, 5, 7, 8, 10],
+              mood: "Spanish, flamenco, Middle Eastern",
+              parent: "5th mode of Harmonic Minor",
+              funFacts: ["THE flamenco scale", "Dick Dale's surf sound", "Called 'Freygish' in Jewish music"] },
+            { name: "Double Harmonic", altName: "Byzantine", category: "World/Exotic", intervals: [0, 1, 4, 5, 7, 8, 11],
+              mood: "Extremely exotic, Byzantine, ancient",
+              parent: "Major with b2 and b6",
+              funFacts: ["Misirlou (Pulp Fiction)", "Two augmented 2nds", "Used in Byzantine church music"] },
+            { name: "Persian", category: "World/Exotic", intervals: [0, 1, 4, 5, 6, 8, 11],
+              mood: "Ancient Persian, dark exotic, intense",
+              parent: "Unique Persian scale",
+              funFacts: ["Used in Persian classical", "Very dark due to b5", "Two augmented 2nds"] },
+            { name: "Arabian", category: "World/Exotic", intervals: [0, 2, 4, 5, 6, 8, 10],
+              mood: "Middle Eastern, desert, mystical",
+              parent: "Major with b5 and b6",
+              funFacts: ["The 'Hollywood Middle East' sound", "More Orientalist fantasy than authentic", "That b5 is the exotic note"] },
+            { name: "Romanian Minor", altName: "Ukrainian Dorian", category: "World/Exotic", intervals: [0, 2, 3, 6, 7, 9, 10],
+              mood: "Eastern European, gypsy, dramatic",
+              parent: "Dorian with #4",
+              funFacts: ["The #4 is the 'gypsy note'", "Used in klezmer", "Eastern European folk favorite"] },
+            { name: "Hungarian Major", category: "World/Exotic", intervals: [0, 3, 4, 6, 7, 9, 10],
+              mood: "Bright gypsy, exotic major, festive",
+              parent: "Major with #2 and #4",
+              funFacts: ["The 'happy' Hungarian scale", "Celebratory, festive quality", "Less common than Hungarian Minor"] },
+            { name: "Prometheus", category: "World/Exotic", intervals: [0, 2, 4, 6, 9, 10],
+              mood: "Mystical, Scriabin, atonal-adjacent",
+              parent: "Scriabin's synthetic scale",
+              funFacts: ["Created by Alexander Scriabin", "Used in 'Poem of Fire'", "Scriabin associated it with colors"] },
+            { name: "Enigmatic", category: "World/Exotic", intervals: [0, 1, 4, 6, 8, 10, 11],
+              mood: "Mysterious, unresolved, strange",
+              parent: "Verdi's artificial scale",
+              funFacts: ["Created by Verdi in 1888", "Joe Satriani uses this", "Nearly impossible to find key center"] },
+        ];
+
+        const CATEGORY_ORDER = [
+            "Major Modes",
+            "Minor Variants", 
+            "Pentatonic",
+            "Blues",
+            "Symmetric",
+            "Dominant/Jazz",
+            "Bebop",
+            "World/Exotic"
+        ];
+
+        // ============================================
+        // CONSTANTS
+        // ============================================
+        const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const DEGREE_NAMES = ['1', '♭2', '2', '♭3', '3', '4', '♭5', '5', '♭6', '6', '♭7', '7'];
+        const FIRST_NOTE = 21;
+        const LAST_NOTE = 108;
+
+        // ============================================
+        // STATE
+        // ============================================
+        let quizMode = 'structured'; // 'structured' or 'random'
+        let categoryQueues = {};
+        let currentCategoryIndex = 0;
+        let currentScaleIndexInCategory = 0;
+        let randomQueue = [];
+        let randomIndex = 0;
+        let totalCompleted = 0;
+        
+        let currentScale = null;
+        let currentRoot = 0;
+        let expectedNotes = [];
+        let currentNoteIndex = 0;
+        let completedNotes = [];
+        let hintShown = false;
+        
+        const activeNotes = new Set();
+        let sampler = null;
+        let audioStarted = false;
+        let midiConnected = false;
+
+        // ============================================
+        // DOM ELEMENTS
+        // ============================================
+        const piano = document.getElementById('piano');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const deviceName = document.getElementById('deviceName');
+        const errorContainer = document.getElementById('errorContainer');
+        
+        const structuredBtn = document.getElementById('structuredBtn');
+        const randomBtn = document.getElementById('randomBtn');
+        
+        const progressCategory = document.getElementById('progressCategory');
+        const progressOverall = document.getElementById('progressOverall');
+        const progressFill = document.getElementById('progressFill');
+        const progressCount = document.getElementById('progressCount');
+        
+        const quizCard = document.getElementById('quizCard');
+        const scaleName = document.getElementById('scaleName');
+        const scaleCategoryBadge = document.getElementById('scaleCategoryBadge');
+        const stepPattern = document.getElementById('stepPattern');
+        const scaleDegrees = document.getElementById('scaleDegrees');
+        const parentScaleItem = document.getElementById('parentScaleItem');
+        const parentScale = document.getElementById('parentScale');
+        const moodText = document.getElementById('moodText');
+        const funFactText = document.getElementById('funFactText');
+        
+        const hintBtn = document.getElementById('hintBtn');
+        const hintNotes = document.getElementById('hintNotes');
+        const noteProgress = document.getElementById('noteProgress');
+        const successMessage = document.getElementById('successMessage');
+        const categoryComplete = document.getElementById('categoryComplete');
+        const categoryCompleteTitle = document.getElementById('categoryCompleteTitle');
+        const categoryCompleteSub = document.getElementById('categoryCompleteSub');
+        
+        const pianoSection = document.getElementById('pianoSection');
+        const completionScreen = document.getElementById('completionScreen');
+        
+        const retryBtn = document.getElementById('retryBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const nextCategoryBtn = document.getElementById('nextCategoryBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const prevArrow = document.getElementById('prevArrow');
+        const nextArrow = document.getElementById('nextArrow');
+
+        // ============================================
+        // AUDIO SETUP
+        // ============================================
+        function initAudio() {
+            sampler = new Tone.Sampler({
+                urls: {
+                    "C4": "C4.mp3",
+                    "D#4": "Ds4.mp3",
+                    "F#4": "Fs4.mp3",
+                    "A4": "A4.mp3",
+                    "C5": "C5.mp3",
+                    "D#5": "Ds5.mp3",
+                    "F#5": "Fs5.mp3",
+                    "A5": "A5.mp3",
+                },
+                release: 1,
+                baseUrl: "https://tonejs.github.io/audio/salamander/",
+            }).toDestination();
+        }
+
+        async function startAudioContext() {
+            if (!audioStarted) {
+                await Tone.start();
+                audioStarted = true;
+            }
+        }
+
+        function playNote(midi) {
+            if (sampler && sampler.loaded) {
+                sampler.triggerAttack(midiToToneName(midi));
+            }
+        }
+
+        function releaseNote(midi) {
+            if (sampler && sampler.loaded) {
+                sampler.triggerRelease(midiToToneName(midi));
+            }
+        }
+
+        function midiToToneName(midi) {
+            const octave = Math.floor(midi / 12) - 1;
+            return `${NOTE_NAMES[midi % 12]}${octave}`;
+        }
+
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        function midiToNoteName(midi) {
+            const octave = Math.floor(midi / 12) - 1;
+            return `${NOTE_NAMES[midi % 12]}${octave}`;
+        }
+
+        function isBlackKey(midi) {
+            return [1, 3, 6, 8, 10].includes(midi % 12);
+        }
+
+        function shuffle(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function getScaleNotesWithOctave(scale, root) {
+            const startMidi = 60 + root;
+            const notes = scale.intervals.map(interval => startMidi + interval);
+            notes.push(startMidi + 12);
+            return notes;
+        }
+
+        function intervalsToStepPattern(intervals) {
+            const steps = [];
+            for (let i = 1; i < intervals.length; i++) {
+                const diff = intervals[i] - intervals[i-1];
+                if (diff === 1) steps.push('H');
+                else if (diff === 2) steps.push('W');
+                else if (diff === 3) steps.push('W+H');
+                else steps.push(diff.toString());
+            }
+            // Add final step back to root
+            const lastToRoot = 12 - intervals[intervals.length - 1];
+            if (lastToRoot === 1) steps.push('H');
+            else if (lastToRoot === 2) steps.push('W');
+            else if (lastToRoot === 3) steps.push('W+H');
+            else steps.push(lastToRoot.toString());
+            return steps.join('-');
+        }
+
+        function intervalsToScaleDegrees(intervals) {
+            return intervals.map(interval => DEGREE_NAMES[interval]).join(' ');
+        }
+
+        // ============================================
+        // PIANO BUILDING
+        // ============================================
+        function buildPiano() {
+            let whiteKeyIndex = 0;
+            const whiteKeyWidth = 26;
+            
+            for (let midi = FIRST_NOTE; midi <= LAST_NOTE; midi++) {
+                if (!isBlackKey(midi)) {
+                    const key = document.createElement('div');
+                    key.className = 'key white';
+                    key.dataset.midi = midi;
+                    addKeyListeners(key, midi);
+                    piano.appendChild(key);
+                    whiteKeyIndex++;
+                }
+            }
+
+            whiteKeyIndex = 0;
+            for (let midi = FIRST_NOTE; midi <= LAST_NOTE; midi++) {
+                if (!isBlackKey(midi)) {
+                    whiteKeyIndex++;
+                } else {
+                    const key = document.createElement('div');
+                    key.className = 'key black';
+                    key.dataset.midi = midi;
+                    const leftOffset = (whiteKeyIndex * whiteKeyWidth) - 9;
+                    key.style.left = `${leftOffset}px`;
+                    addKeyListeners(key, midi);
+                    piano.appendChild(key);
+                }
+            }
+        }
+
+        function addKeyListeners(key, midi) {
+            key.addEventListener('mousedown', async (e) => {
+                e.preventDefault();
+                await startAudioContext();
+                if (!midiConnected) {
+                    activateKey(midi);
+                    playNote(midi);
+                    handleNoteInput(midi);
+                }
+            });
+            
+            key.addEventListener('mouseup', () => {
+                if (!midiConnected) {
+                    deactivateKey(midi);
+                    releaseNote(midi);
+                }
+            });
+            
+            key.addEventListener('mouseleave', () => {
+                if (!midiConnected && activeNotes.has(midi)) {
+                    deactivateKey(midi);
+                    releaseNote(midi);
+                }
+            });
+
+            key.addEventListener('touchstart', async (e) => {
+                e.preventDefault();
+                await startAudioContext();
+                if (!midiConnected) {
+                    activateKey(midi);
+                    playNote(midi);
+                    handleNoteInput(midi);
+                }
+            });
+            
+            key.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (!midiConnected) {
+                    deactivateKey(midi);
+                    releaseNote(midi);
+                }
+            });
+        }
+
+        function activateKey(midi) {
+            activeNotes.add(midi);
+            const keyEl = piano.querySelector(`[data-midi="${midi}"]`);
+            if (keyEl) keyEl.classList.add('active');
+        }
+
+        function deactivateKey(midi) {
+            activeNotes.delete(midi);
+            const keyEl = piano.querySelector(`[data-midi="${midi}"]`);
+            if (keyEl) keyEl.classList.remove('active');
+        }
+
+        function updatePianoDisplay() {
+            // First, clear ALL visual states from all keys
+            document.querySelectorAll('.key').forEach(key => {
+                key.classList.remove('target', 'completed', 'active');
+            });
+            
+            // Then apply current state
+            document.querySelectorAll('.key').forEach(key => {
+                const midi = parseInt(key.dataset.midi);
+                
+                // Mark completed notes
+                if (completedNotes.includes(midi)) {
+                    key.classList.add('completed');
+                }
+                // Mark current target note (only if not completed)
+                else if (currentNoteIndex < expectedNotes.length && expectedNotes[currentNoteIndex] === midi) {
+                    key.classList.add('target');
+                }
+            });
+
+            // Scroll to target
+            if (currentNoteIndex < expectedNotes.length && expectedNotes[currentNoteIndex]) {
+                const targetKey = piano.querySelector(`[data-midi="${expectedNotes[currentNoteIndex]}"]`);
+                if (targetKey) {
+                    const wrapper = document.querySelector('.piano-wrapper');
+                    const wrapperRect = wrapper.getBoundingClientRect();
+                    const scrollTarget = targetKey.offsetLeft - (wrapperRect.width / 2) + 13;
+                    wrapper.scrollTo({ left: scrollTarget, behavior: 'smooth' });
+                }
+            }
+        }
+
+        // ============================================
+        // QUIZ INITIALIZATION
+        // ============================================
+        function initQuiz() {
+            // Build category queues
+            categoryQueues = {};
+            CATEGORY_ORDER.forEach(cat => {
+                const scalesInCategory = SCALES.filter(s => s.category === cat);
+                categoryQueues[cat] = shuffle(scalesInCategory.map(scale => ({
+                    scale: scale,
+                    root: Math.floor(Math.random() * 12)
+                })));
+            });
+
+            // Build random queue
+            randomQueue = shuffle(SCALES.map(scale => ({
+                scale: scale,
+                root: Math.floor(Math.random() * 12)
+            })));
+            randomIndex = 0;
+
+            currentCategoryIndex = 0;
+            currentScaleIndexInCategory = 0;
+            totalCompleted = 0;
+
+            loadCurrentScale();
+        }
+
+        function getCurrentQuizItem() {
+            if (quizMode === 'random') {
+                return randomQueue[randomIndex];
+            } else {
+                const category = CATEGORY_ORDER[currentCategoryIndex];
+                return categoryQueues[category][currentScaleIndexInCategory];
+            }
+        }
+
+        function loadCurrentScale() {
+            // Check completion
+            if (quizMode === 'random' && randomIndex >= randomQueue.length) {
+                showCompletion();
+                return;
+            }
+            if (quizMode === 'structured' && currentCategoryIndex >= CATEGORY_ORDER.length) {
+                showCompletion();
+                return;
+            }
+
+            // FORCE clear all piano key states immediately
+            document.querySelectorAll('.key').forEach(key => {
+                key.classList.remove('target', 'completed', 'active');
+            });
+
+            const quizItem = getCurrentQuizItem();
+            currentScale = quizItem.scale;
+            currentRoot = quizItem.root;
+            
+            expectedNotes = getScaleNotesWithOctave(currentScale, currentRoot);
+            currentNoteIndex = 0;
+            completedNotes = [];
+            hintShown = false;
+
+            // Update UI
+            const rootName = NOTE_NAMES[currentRoot];
+            scaleName.textContent = `${rootName} ${currentScale.name}`;
+            scaleCategoryBadge.textContent = currentScale.category;
+            
+            // Theory info
+            stepPattern.textContent = intervalsToStepPattern(currentScale.intervals);
+            scaleDegrees.textContent = intervalsToScaleDegrees(currentScale.intervals);
+            
+            if (currentScale.parent) {
+                parentScaleItem.style.display = 'block';
+                parentScale.textContent = currentScale.parent;
+            } else {
+                parentScaleItem.style.display = 'none';
+            }
+
+            // Mood and fun fact
+            moodText.textContent = currentScale.mood;
+            const randomFact = currentScale.funFacts[Math.floor(Math.random() * currentScale.funFacts.length)];
+            funFactText.textContent = randomFact;
+
+            // Reset hint
+            hintBtn.textContent = 'Show Notes';
+            hintNotes.classList.remove('visible');
+            hintNotes.innerHTML = expectedNotes
+                .map(midi => `<span class="hint-note">${midiToNoteName(midi)}</span>`)
+                .join('');
+
+            // Build note progress
+            noteProgress.innerHTML = expectedNotes
+                .map((_, i) => `<div class="note-slot" data-index="${i}">${i + 1}</div>`)
+                .join('');
+
+            // Reset states
+            successMessage.classList.remove('visible');
+            categoryComplete.classList.remove('visible');
+            noteProgress.style.display = 'flex';
+
+            updateProgress();
+            updatePianoDisplay();
+            updateNoteProgressUI();
+            updateNavArrows();
+        }
+
+        // ============================================
+        // PROGRESS & UI UPDATES
+        // ============================================
+        function updateProgress() {
+            if (quizMode === 'random') {
+                progressCategory.textContent = 'Random Mode';
+                progressOverall.textContent = '';
+                const percent = (randomIndex / randomQueue.length) * 100;
+                progressFill.style.width = `${percent}%`;
+                progressCount.textContent = `${randomIndex} / ${randomQueue.length}`;
+            } else {
+                const category = CATEGORY_ORDER[currentCategoryIndex];
+                const categoryScales = categoryQueues[category];
+                progressCategory.textContent = category;
+                progressOverall.textContent = `Overall: ${totalCompleted} / ${SCALES.length}`;
+                const percent = (currentScaleIndexInCategory / categoryScales.length) * 100;
+                progressFill.style.width = `${percent}%`;
+                progressCount.textContent = `${currentScaleIndexInCategory} / ${categoryScales.length}`;
+            }
+        }
+
+        function updateNoteProgressUI() {
+            document.querySelectorAll('.note-slot').forEach((slot, i) => {
+                slot.classList.remove('current', 'completed', 'wrong');
+                if (i < currentNoteIndex) {
+                    slot.classList.add('completed');
+                } else if (i === currentNoteIndex) {
+                    slot.classList.add('current');
+                }
+            });
+        }
+
+        // ============================================
+        // NOTE INPUT HANDLING
+        // ============================================
+        function handleNoteInput(midi) {
+            if (successMessage.classList.contains('visible')) return;
+            if (categoryComplete.classList.contains('visible')) return;
+
+            const expectedMidi = expectedNotes[currentNoteIndex];
+            const expectedNoteClass = expectedMidi % 12;
+            const playedNoteClass = midi % 12;
+            
+            if (playedNoteClass === expectedNoteClass) {
+                // Correct note!
+                completedNotes.push(expectedMidi);
+                currentNoteIndex++;
+                
+                updateNoteProgressUI();
+                updatePianoDisplay();
+
+                if (currentNoteIndex >= expectedNotes.length) {
+                    showSuccess();
+                }
+            }
+            // Wrong notes are simply ignored - no penalty
+        }
+
+        function showSuccess() {
+            if (midiConnected) {
+                // Auto-continue after brief celebration
+                noteProgress.style.display = 'none';
+                successMessage.classList.add('visible');
+                
+                setTimeout(() => {
+                    successMessage.classList.remove('visible');
+                    noteProgress.style.display = 'flex';
+                    nextScale();
+                }, 800);
+            } else {
+                // Show buttons for click-based interaction
+                noteProgress.style.display = 'none';
+                successMessage.classList.add('visible');
+            }
+        }
+
+        function showCategoryComplete() {
+            const category = CATEGORY_ORDER[currentCategoryIndex];
+            categoryCompleteTitle.textContent = `${category} Complete!`;
+            const count = categoryQueues[category].length;
+            categoryCompleteSub.textContent = `You've mastered all ${count} scales in this category.`;
+            
+            noteProgress.style.display = 'none';
+            successMessage.classList.remove('visible');
+            categoryComplete.classList.add('visible');
+        }
+
+        function showCompletion() {
+            quizCard.style.display = 'none';
+            pianoSection.style.display = 'none';
+            completionScreen.classList.add('visible');
+        }
+
+        // ============================================
+        // NAVIGATION
+        // ============================================
+        function retry() {
+            currentNoteIndex = 0;
+            completedNotes = [];
+            successMessage.classList.remove('visible');
+            noteProgress.style.display = 'flex';
+            updateNoteProgressUI();
+            updatePianoDisplay();
+        }
+
+        function prevScale() {
+            // First hide any success/complete messages
+            successMessage.classList.remove('visible');
+            categoryComplete.classList.remove('visible');
+            
+            if (quizMode === 'random') {
+                if (randomIndex > 0) {
+                    randomIndex--;
+                    if (totalCompleted > 0) totalCompleted--;
+                    loadCurrentScale();
+                }
+            } else {
+                if (currentScaleIndexInCategory > 0) {
+                    currentScaleIndexInCategory--;
+                    if (totalCompleted > 0) totalCompleted--;
+                    loadCurrentScale();
+                } else if (currentCategoryIndex > 0) {
+                    // Go to previous category's last scale
+                    currentCategoryIndex--;
+                    const prevCategory = CATEGORY_ORDER[currentCategoryIndex];
+                    currentScaleIndexInCategory = categoryQueues[prevCategory].length - 1;
+                    if (totalCompleted > 0) totalCompleted--;
+                    loadCurrentScale();
+                }
+            }
+            updateNavArrows();
+        }
+
+        function nextScale() {
+            if (quizMode === 'random') {
+                randomIndex++;
+                totalCompleted++;
+                loadCurrentScale();
+            } else {
+                currentScaleIndexInCategory++;
+                totalCompleted++;
+                
+                const category = CATEGORY_ORDER[currentCategoryIndex];
+                if (currentScaleIndexInCategory >= categoryQueues[category].length) {
+                    // Category complete
+                    showCategoryComplete();
+                } else {
+                    loadCurrentScale();
+                }
+            }
+            updateNavArrows();
+        }
+
+        function skipToNextScale() {
+            // For arrow navigation - doesn't increment completed count
+            // First hide any success/complete messages
+            successMessage.classList.remove('visible');
+            categoryComplete.classList.remove('visible');
+            
+            if (quizMode === 'random') {
+                if (randomIndex < randomQueue.length - 1) {
+                    randomIndex++;
+                    loadCurrentScale();
+                }
+            } else {
+                const category = CATEGORY_ORDER[currentCategoryIndex];
+                if (currentScaleIndexInCategory < categoryQueues[category].length - 1) {
+                    currentScaleIndexInCategory++;
+                    loadCurrentScale();
+                } else if (currentCategoryIndex < CATEGORY_ORDER.length - 1) {
+                    // Go to next category's first scale
+                    currentCategoryIndex++;
+                    currentScaleIndexInCategory = 0;
+                    loadCurrentScale();
+                }
+            }
+            updateNavArrows();
+        }
+
+        function updateNavArrows() {
+            // Update prev arrow
+            if (quizMode === 'random') {
+                prevArrow.disabled = randomIndex <= 0;
+                nextArrow.disabled = randomIndex >= randomQueue.length - 1;
+            } else {
+                const isFirstScale = currentCategoryIndex === 0 && currentScaleIndexInCategory === 0;
+                const category = CATEGORY_ORDER[currentCategoryIndex];
+                const isLastScale = currentCategoryIndex >= CATEGORY_ORDER.length - 1 && 
+                                    currentScaleIndexInCategory >= categoryQueues[category].length - 1;
+                prevArrow.disabled = isFirstScale;
+                nextArrow.disabled = isLastScale;
+            }
+        }
+
+        function nextCategory() {
+            currentCategoryIndex++;
+            currentScaleIndexInCategory = 0;
+            categoryComplete.classList.remove('visible');
+            noteProgress.style.display = 'flex';
+            
+            if (currentCategoryIndex >= CATEGORY_ORDER.length) {
+                showCompletion();
+            } else {
+                loadCurrentScale();
+            }
+        }
+
+        function restartQuiz() {
+            quizCard.style.display = 'block';
+            pianoSection.style.display = 'block';
+            completionScreen.classList.remove('visible');
+            initQuiz();
+        }
+
+        function setMode(mode) {
+            quizMode = mode;
+            structuredBtn.classList.toggle('active', mode === 'structured');
+            randomBtn.classList.toggle('active', mode === 'random');
+            
+            // Reset progress for this mode
+            if (mode === 'random') {
+                randomIndex = 0;
+            } else {
+                currentCategoryIndex = 0;
+                currentScaleIndexInCategory = 0;
+            }
+            totalCompleted = 0;
+            
+            loadCurrentScale();
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        structuredBtn.addEventListener('click', () => setMode('structured'));
+        randomBtn.addEventListener('click', () => setMode('random'));
+        
+        hintBtn.addEventListener('click', () => {
+            hintShown = !hintShown;
+            hintNotes.classList.toggle('visible', hintShown);
+            hintBtn.textContent = hintShown ? 'Hide Notes' : 'Show Notes';
+        });
+
+        retryBtn.addEventListener('click', retry);
+        nextBtn.addEventListener('click', nextScale);
+        nextCategoryBtn.addEventListener('click', nextCategory);
+        restartBtn.addEventListener('click', restartQuiz);
+        
+        prevArrow.addEventListener('click', prevScale);
+        nextArrow.addEventListener('click', skipToNextScale);
+
+        // ============================================
+        // MIDI HANDLING
+        // ============================================
+        function onMIDIMessage(event) {
+            const [status, note, velocity] = event.data;
+            
+            const isNoteOn = (status >= 144 && status <= 159) && velocity > 0;
+            const isNoteOff = (status >= 128 && status <= 143) || 
+                             ((status >= 144 && status <= 159) && velocity === 0);
+
+            if (isNoteOn) {
+                activateKey(note);
+                handleNoteInput(note);
+            } else if (isNoteOff) {
+                deactivateKey(note);
+            }
+        }
+
+        function onMIDISuccess(midiAccess) {
+            const inputs = midiAccess.inputs.values();
+            let connected = false;
+
+            for (let input of inputs) {
+                input.onmidimessage = onMIDIMessage;
+                if (!connected) {
+                    statusDot.classList.add('connected');
+                    statusText.textContent = 'Connected';
+                    deviceName.textContent = input.name || 'Unknown device';
+                    connected = true;
+                    midiConnected = true;
+                }
+            }
+
+            if (!connected) {
+                statusText.textContent = 'No MIDI';
+                deviceName.textContent = 'Click keys to play';
+                midiConnected = false;
+            }
+
+            midiAccess.onstatechange = (e) => {
+                if (e.port.state === 'connected' && e.port.type === 'input') {
+                    e.port.onmidimessage = onMIDIMessage;
+                    statusDot.classList.add('connected');
+                    statusText.textContent = 'Connected';
+                    deviceName.textContent = e.port.name || 'Unknown device';
+                    midiConnected = true;
+                } else if (e.port.state === 'disconnected' && e.port.type === 'input') {
+                    statusDot.classList.remove('connected');
+                    statusText.textContent = 'Disconnected';
+                    deviceName.textContent = 'Click keys to play';
+                    midiConnected = false;
+                    activeNotes.clear();
+                    document.querySelectorAll('.key.active').forEach(k => k.classList.remove('active'));
+                }
+            };
+        }
+
+        function onMIDIFailure(error) {
+            statusText.textContent = 'No MIDI';
+            deviceName.textContent = 'Click keys to play';
+            midiConnected = false;
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            buildPiano();
+            initAudio();
+            initQuiz();
+
+            if (navigator.requestMIDIAccess) {
+                navigator.requestMIDIAccess({ sysex: false })
+                    .then(onMIDISuccess)
+                    .catch(onMIDIFailure);
+            } else {
+                statusText.textContent = 'No MIDI';
+                deviceName.textContent = 'Click keys to play';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
