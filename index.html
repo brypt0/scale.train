@@ -443,12 +443,33 @@
             border-top: 1px solid var(--border-subtle);
         }
 
+        .chord-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
         .chord-section-title {
             font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-dim);
-            margin-bottom: 0.75rem;
+        }
+
+        .voicing-select {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.75rem;
+            padding: 0.3rem 0.5rem;
+            cursor: pointer;
+        }
+
+        .voicing-select:hover {
+            border-color: var(--accent);
         }
 
         .chord-grid {
@@ -511,6 +532,151 @@
             color: var(--text-dim);
             font-style: italic;
             margin-top: 0.5rem;
+        }
+
+        /* Extensions display */
+        .extensions-section {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .extensions-section.visible {
+            display: block;
+        }
+
+        .extensions-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+
+        .extensions-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .extension-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            padding: 0.35rem 0.5rem;
+            min-width: 45px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .extension-item:hover:not(.avoid) {
+            border-color: #c084fc;
+            background: var(--bg-elevated);
+        }
+
+        .extension-item:active:not(.avoid) {
+            transform: scale(0.95);
+        }
+
+        .extension-label {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+        }
+
+        .extension-note {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #c084fc;
+        }
+
+        .extension-item.avoid {
+            opacity: 0.4;
+            border-style: dashed;
+        }
+
+        .extension-item.avoid .extension-note {
+            color: var(--text-dim);
+            text-decoration: line-through;
+        }
+
+        /* Progressions section */
+        .progressions-section {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .progressions-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+
+        .progression-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .progression-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .progression-item:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
+
+        .progression-item.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .progression-item.active .progression-numerals,
+        .progression-item.active .progression-name,
+        .progression-item.active .progression-chords {
+            color: var(--bg-deep);
+        }
+
+        .progression-numerals {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            min-width: 120px;
+        }
+
+        .progression-name {
+            font-size: 0.75rem;
+            color: var(--accent);
+            min-width: 80px;
+        }
+
+        .progression-chords {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            flex: 1;
+        }
+
+        .progression-play-hint {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            margin-top: 0.5rem;
+            font-style: italic;
         }
 
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -1527,6 +1693,7 @@
         let selectedScale = null;
         let selectedRoot = 0; // C
         let selectedChord = null; // Currently selected chord index
+        let currentVoicing = 'basic'; // basic, 7ths, shells
         const activeNotes = new Set();
         let sampler = null;
         let audioStarted = false;
@@ -1628,141 +1795,359 @@
         // ============================================
         // CHORD FUNCTIONS
         // ============================================
-        function getDiatonicChords(scale, root) {
+        
+        // 7th chord types based on intervals
+        const SEVENTH_TYPES = {
+            'maj7': { intervals: [0, 4, 7, 11], symbol: 'maj7' },
+            'min7': { intervals: [0, 3, 7, 10], symbol: 'm7' },
+            'dom7': { intervals: [0, 4, 7, 10], symbol: '7' },
+            'min7b5': { intervals: [0, 3, 6, 10], symbol: 'm7♭5' },
+            'dim7': { intervals: [0, 3, 6, 9], symbol: '°7' },
+            'minMaj7': { intervals: [0, 3, 7, 11], symbol: 'mMaj7' },
+            'aug7': { intervals: [0, 4, 8, 10], symbol: '+7' },
+            'augMaj7': { intervals: [0, 4, 8, 11], symbol: '+Maj7' }
+        };
+        
+        // Common chord progressions by scale type
+        const PROGRESSIONS = {
+            major: [
+                { numerals: 'I - IV - V - I', name: 'Classic', description: 'The foundation of Western music' },
+                { numerals: 'I - V - vi - IV', name: 'Pop', description: 'Thousands of pop songs use this' },
+                { numerals: 'ii - V - I', name: 'Jazz', description: 'THE jazz cadence - learn this one' },
+                { numerals: 'I - vi - IV - V', name: '50s', description: 'Doo-wop, oldies, still works great' },
+                { numerals: 'vi - IV - I - V', name: 'Emotional', description: 'Minor start feels more dramatic' },
+                { numerals: 'I - IV - vi - V', name: 'Anthem', description: 'Big, uplifting chorus feel' }
+            ],
+            minor: [
+                { numerals: 'i - iv - V - i', name: 'Minor Classic', description: 'Basic minor resolution' },
+                { numerals: 'i - VII - VI - VII', name: 'Andalusian', description: 'Flamenco, dramatic, descending' },
+                { numerals: 'i - iv - VII - III', name: 'Epic', description: 'Cinematic, building tension' },
+                { numerals: 'ii° - V - i', name: 'Jazz Minor', description: 'Minor ii-V-i with half-dim ii' },
+                { numerals: 'i - VI - III - VII', name: 'Pop Minor', description: 'Modern pop in minor keys' },
+                { numerals: 'i - VII - VI - V', name: 'Descending', description: 'Classic minor descent to V' }
+            ],
+            blues: [
+                { numerals: 'I7 - IV7 - I7 - V7', name: '12-Bar Basic', description: 'Simplified 12-bar structure' },
+                { numerals: 'I7 - IV7 - I7 - I7', name: 'Turnaround', description: 'First 4 bars of 12-bar blues' },
+                { numerals: 'I7 - I7 - IV7 - IV7', name: 'Slow Blues', description: 'Drawn out changes' }
+            ],
+            dorian: [
+                { numerals: 'i - IV', name: 'Dorian Vamp', description: 'So What, Oye Como Va - just these two' },
+                { numerals: 'i - IV - i - V', name: 'Dorian Rock', description: 'Minor with major IV is the Dorian sound' },
+                { numerals: 'i - ii - IV - i', name: 'Funk', description: 'Funky Dorian groove' }
+            ],
+            mixolydian: [
+                { numerals: 'I - VII - IV', name: 'Rock', description: 'Classic rock sound (Sweet Home Alabama)' },
+                { numerals: 'I - VII - I', name: 'Simple', description: 'Just the I and flat-VII' },
+                { numerals: 'I - IV - VII - IV', name: 'Jam', description: 'Grateful Dead style' }
+            ]
+        };
+        
+        function getProgressionsForScale(scale) {
+            const name = scale.name.toLowerCase();
+            const category = scale.category.toLowerCase();
+            
+            // Match scale to progression set
+            if (name.includes('dorian')) return PROGRESSIONS.dorian;
+            if (name.includes('mixolydian')) return PROGRESSIONS.mixolydian;
+            if (name.includes('blues')) return PROGRESSIONS.blues;
+            if (name.includes('minor') || name.includes('aeolian') || name.includes('phrygian')) return PROGRESSIONS.minor;
+            if (name.includes('major') || name.includes('ionian') || name.includes('lydian')) return PROGRESSIONS.major;
+            if (category.includes('pentatonic')) {
+                return scale.intervals.includes(4) ? PROGRESSIONS.major : PROGRESSIONS.minor;
+            }
+            
+            // Default based on 3rd
+            return scale.intervals.includes(4) ? PROGRESSIONS.major : PROGRESSIONS.minor;
+        }
+        
+        function parseProgressionNumerals(numeralStr, scale, root) {
+            // Convert "I - IV - V - I" to actual chord names
+            const numerals = numeralStr.split(' - ');
+            const chords = getDiatonicChords(scale, root, currentVoicing);
+            
+            return numerals.map(num => {
+                // Clean up numeral
+                const clean = num.replace('°', '').replace('7', '').toLowerCase();
+                const romanToIndex = { 'i': 0, 'ii': 1, 'iii': 2, 'iv': 3, 'v': 4, 'vi': 5, 'vii': 6 };
+                const index = romanToIndex[clean];
+                
+                if (index !== undefined && chords[index]) {
+                    return chords[index];
+                }
+                return null;
+            }).filter(c => c !== null);
+        }
+        
+        function getDiatonicChords(scale, root, voicingType = 'basic') {
             const intervals = scale.intervals;
             const numNotes = intervals.length;
             
             // For non-standard scales, return common chord suggestions
             if (numNotes === 5) {
-                // Pentatonic - return common chords
-                return getPentatonicChords(scale, root);
+                return getPentatonicChords(scale, root, voicingType);
             } else if (numNotes === 6) {
-                // Blues/Hexatonic - return blues chords
-                return getBluesChords(scale, root);
+                return getBluesChords(scale, root, voicingType);
             } else if (numNotes === 8) {
-                // Bebop/Diminished - use first 7 degrees
-                return getBebopChords(scale, root);
+                return getBebopChords(scale, root, voicingType);
             } else if (numNotes === 12) {
-                // Chromatic - no diatonic chords
-                return getChromaticChords(root);
+                return getChromaticChords(root, voicingType);
             } else if (numNotes !== 7) {
-                // Other unusual scales
-                return getGenericChords(scale, root);
+                return getGenericChords(scale, root, voicingType);
             }
             
-            // Standard 7-note scale - build triads on each degree
+            // Standard 7-note scale - build chords on each degree
             const chords = [];
             for (let degree = 0; degree < 7; degree++) {
                 const rootInterval = intervals[degree];
                 const thirdInterval = intervals[(degree + 2) % 7] + (degree + 2 >= 7 ? 12 : 0);
                 const fifthInterval = intervals[(degree + 4) % 7] + (degree + 4 >= 7 ? 12 : 0);
+                const seventhInterval = intervals[(degree + 6) % 7] + (degree + 6 >= 7 ? 12 : 0);
                 
                 const thirdSize = thirdInterval - rootInterval;
                 const fifthSize = fifthInterval - rootInterval;
+                const seventhSize = seventhInterval - rootInterval;
                 
-                let chordType;
-                if (thirdSize === 4 && fifthSize === 7) chordType = 'maj';
-                else if (thirdSize === 3 && fifthSize === 7) chordType = 'min';
-                else if (thirdSize === 3 && fifthSize === 6) chordType = 'dim';
-                else if (thirdSize === 4 && fifthSize === 8) chordType = 'aug';
-                else chordType = fifthSize === 7 ? (thirdSize === 4 ? 'maj' : 'min') : 'dim';
+                // Determine chord quality
+                let triadType, seventhType;
+                if (thirdSize === 4 && fifthSize === 7) triadType = 'maj';
+                else if (thirdSize === 3 && fifthSize === 7) triadType = 'min';
+                else if (thirdSize === 3 && fifthSize === 6) triadType = 'dim';
+                else if (thirdSize === 4 && fifthSize === 8) triadType = 'aug';
+                else triadType = fifthSize === 7 ? (thirdSize === 4 ? 'maj' : 'min') : 'dim';
+                
+                // Determine 7th type
+                if (triadType === 'maj' && seventhSize === 11) seventhType = 'maj7';
+                else if (triadType === 'maj' && seventhSize === 10) seventhType = 'dom7';
+                else if (triadType === 'min' && seventhSize === 10) seventhType = 'min7';
+                else if (triadType === 'min' && seventhSize === 11) seventhType = 'minMaj7';
+                else if (triadType === 'dim' && seventhSize === 10) seventhType = 'min7b5';
+                else if (triadType === 'dim' && seventhSize === 9) seventhType = 'dim7';
+                else if (triadType === 'aug' && seventhSize === 11) seventhType = 'augMaj7';
+                else if (triadType === 'aug' && seventhSize === 10) seventhType = 'aug7';
+                else seventhType = 'dom7'; // fallback
                 
                 const chordRoot = (root + rootInterval) % 12;
-                const chordNotes = [
-                    chordRoot,
-                    (chordRoot + (chordType === 'maj' || chordType === 'aug' ? 4 : 3)) % 12,
-                    (chordRoot + (chordType === 'dim' ? 6 : chordType === 'aug' ? 8 : 7)) % 12
-                ];
                 
-                const symbol = CHORD_TYPES[chordType].symbol;
-                const numeral = chordType === 'min' || chordType === 'dim' 
+                // Build chord based on voicing type
+                let chordNotes, symbol, displayName;
+                
+                if (voicingType === 'basic') {
+                    // Triads
+                    chordNotes = CHORD_TYPES[triadType].intervals.map(i => (chordRoot + i) % 12);
+                    symbol = CHORD_TYPES[triadType].symbol;
+                } else if (voicingType === '7ths') {
+                    // Full 7th chords
+                    chordNotes = SEVENTH_TYPES[seventhType].intervals.map(i => (chordRoot + i) % 12);
+                    symbol = SEVENTH_TYPES[seventhType].symbol;
+                } else if (voicingType === 'shells') {
+                    // Shell voicing: root + 3rd + 7th (no 5th)
+                    const third = thirdSize === 4 ? 4 : 3;
+                    const seventh = seventhSize;
+                    chordNotes = [chordRoot, (chordRoot + third) % 12, (chordRoot + seventh) % 12];
+                    symbol = SEVENTH_TYPES[seventhType].symbol + ' (shell)';
+                }
+                
+                const numeral = triadType === 'min' || triadType === 'dim' 
                     ? ROMAN_NUMERALS[degree].toLowerCase() 
                     : ROMAN_NUMERALS[degree];
                 
                 chords.push({
                     degree: degree + 1,
-                    numeral: numeral + (chordType === 'dim' ? '°' : ''),
+                    numeral: numeral + (triadType === 'dim' ? '°' : ''),
                     name: NOTE_NAMES[chordRoot] + symbol,
-                    type: chordType,
+                    type: triadType,
+                    seventhType: seventhType,
                     notes: chordNotes,
-                    rootMidi: chordRoot
+                    rootMidi: chordRoot,
+                    voicing: voicingType
                 });
             }
             return chords;
         }
         
-        function getPentatonicChords(scale, root) {
-            // Common chords used with pentatonic scales
-            const isMajor = scale.intervals.includes(4); // Has major 3rd
+        function getPentatonicChords(scale, root, voicingType) {
+            const isMajor = scale.intervals.includes(4);
+            const use7ths = voicingType === '7ths' || voicingType === 'shells';
+            
             if (isMajor) {
                 return [
-                    { numeral: 'I', name: NOTE_NAMES[root], type: 'maj', notes: [root, (root+4)%12, (root+7)%12], rootMidi: root },
-                    { numeral: 'IV', name: NOTE_NAMES[(root+5)%12], type: 'maj', notes: [(root+5)%12, (root+9)%12, root], rootMidi: (root+5)%12 },
-                    { numeral: 'V', name: NOTE_NAMES[(root+7)%12], type: 'maj', notes: [(root+7)%12, (root+11)%12, (root+2)%12], rootMidi: (root+7)%12 }
+                    buildChordObject('I', root, 'maj', use7ths ? 'maj7' : null, voicingType),
+                    buildChordObject('IV', (root+5)%12, 'maj', use7ths ? 'maj7' : null, voicingType),
+                    buildChordObject('V', (root+7)%12, 'maj', use7ths ? 'dom7' : null, voicingType)
                 ];
             } else {
                 return [
-                    { numeral: 'i', name: NOTE_NAMES[root] + 'm', type: 'min', notes: [root, (root+3)%12, (root+7)%12], rootMidi: root },
-                    { numeral: 'IV', name: NOTE_NAMES[(root+5)%12], type: 'maj', notes: [(root+5)%12, (root+9)%12, root], rootMidi: (root+5)%12 },
-                    { numeral: 'VII', name: NOTE_NAMES[(root+10)%12], type: 'maj', notes: [(root+10)%12, (root+2)%12, (root+5)%12], rootMidi: (root+10)%12 }
+                    buildChordObject('i', root, 'min', use7ths ? 'min7' : null, voicingType),
+                    buildChordObject('IV', (root+5)%12, 'maj', use7ths ? 'maj7' : null, voicingType),
+                    buildChordObject('VII', (root+10)%12, 'maj', use7ths ? 'dom7' : null, voicingType)
                 ];
             }
         }
         
-        function getBluesChords(scale, root) {
-            // Blues typically uses dominant 7ths, but we'll show triads
+        function getBluesChords(scale, root, voicingType) {
+            // Blues always uses dominant 7ths
             return [
-                { numeral: 'I7', name: NOTE_NAMES[root] + '7', type: 'maj', notes: [root, (root+4)%12, (root+7)%12], rootMidi: root },
-                { numeral: 'IV7', name: NOTE_NAMES[(root+5)%12] + '7', type: 'maj', notes: [(root+5)%12, (root+9)%12, root], rootMidi: (root+5)%12 },
-                { numeral: 'V7', name: NOTE_NAMES[(root+7)%12] + '7', type: 'maj', notes: [(root+7)%12, (root+11)%12, (root+2)%12], rootMidi: (root+7)%12 }
+                buildChordObject('I7', root, 'maj', 'dom7', voicingType),
+                buildChordObject('IV7', (root+5)%12, 'maj', 'dom7', voicingType),
+                buildChordObject('V7', (root+7)%12, 'maj', 'dom7', voicingType)
             ];
         }
         
-        function getBebopChords(scale, root) {
-            // Bebop scales - use standard jazz chords
+        function getBebopChords(scale, root, voicingType) {
             const hasMinor3 = scale.intervals.includes(3);
             if (hasMinor3) {
                 return [
-                    { numeral: 'i', name: NOTE_NAMES[root] + 'm7', type: 'min', notes: [root, (root+3)%12, (root+7)%12], rootMidi: root },
-                    { numeral: 'ii', name: NOTE_NAMES[(root+2)%12] + 'm7', type: 'min', notes: [(root+2)%12, (root+5)%12, (root+9)%12], rootMidi: (root+2)%12 },
-                    { numeral: 'V', name: NOTE_NAMES[(root+7)%12] + '7', type: 'maj', notes: [(root+7)%12, (root+11)%12, (root+2)%12], rootMidi: (root+7)%12 }
+                    buildChordObject('i', root, 'min', 'min7', voicingType),
+                    buildChordObject('ii', (root+2)%12, 'min', 'min7', voicingType),
+                    buildChordObject('V', (root+7)%12, 'maj', 'dom7', voicingType)
                 ];
             } else {
                 return [
-                    { numeral: 'I', name: NOTE_NAMES[root] + 'maj7', type: 'maj', notes: [root, (root+4)%12, (root+7)%12], rootMidi: root },
-                    { numeral: 'ii', name: NOTE_NAMES[(root+2)%12] + 'm7', type: 'min', notes: [(root+2)%12, (root+5)%12, (root+9)%12], rootMidi: (root+2)%12 },
-                    { numeral: 'V', name: NOTE_NAMES[(root+7)%12] + '7', type: 'maj', notes: [(root+7)%12, (root+11)%12, (root+2)%12], rootMidi: (root+7)%12 }
+                    buildChordObject('I', root, 'maj', 'maj7', voicingType),
+                    buildChordObject('ii', (root+2)%12, 'min', 'min7', voicingType),
+                    buildChordObject('V', (root+7)%12, 'maj', 'dom7', voicingType)
                 ];
             }
         }
         
-        function getChromaticChords(root) {
-            // Chromatic scale - any chord works, show basics
+        function getChromaticChords(root, voicingType) {
             return [
-                { numeral: 'I', name: NOTE_NAMES[root], type: 'maj', notes: [root, (root+4)%12, (root+7)%12], rootMidi: root },
-                { numeral: 'i', name: NOTE_NAMES[root] + 'm', type: 'min', notes: [root, (root+3)%12, (root+7)%12], rootMidi: root },
-                { numeral: 'V', name: NOTE_NAMES[(root+7)%12], type: 'maj', notes: [(root+7)%12, (root+11)%12, (root+2)%12], rootMidi: (root+7)%12 }
+                buildChordObject('I', root, 'maj', 'maj7', voicingType),
+                buildChordObject('i', root, 'min', 'min7', voicingType),
+                buildChordObject('V', (root+7)%12, 'maj', 'dom7', voicingType)
             ];
         }
         
-        function getGenericChords(scale, root) {
-            // For exotic scales, just return I and V if possible
-            const has3 = scale.intervals.includes(3) || scale.intervals.includes(4);
+        function getGenericChords(scale, root, voicingType) {
             const isMajor = scale.intervals.includes(4);
             return [
-                { numeral: isMajor ? 'I' : 'i', name: NOTE_NAMES[root] + (isMajor ? '' : 'm'), type: isMajor ? 'maj' : 'min', 
-                  notes: [root, (root + (isMajor ? 4 : 3))%12, (root+7)%12], rootMidi: root }
+                buildChordObject(isMajor ? 'I' : 'i', root, isMajor ? 'maj' : 'min', 
+                    isMajor ? 'maj7' : 'min7', voicingType)
             ];
+        }
+        
+        function buildChordObject(numeral, chordRoot, triadType, seventhType, voicingType) {
+            let chordNotes, symbol;
+            
+            if (voicingType === 'basic' || !seventhType) {
+                chordNotes = CHORD_TYPES[triadType].intervals.map(i => (chordRoot + i) % 12);
+                symbol = CHORD_TYPES[triadType].symbol;
+            } else if (voicingType === '7ths') {
+                chordNotes = SEVENTH_TYPES[seventhType].intervals.map(i => (chordRoot + i) % 12);
+                symbol = SEVENTH_TYPES[seventhType].symbol;
+            } else if (voicingType === 'shells') {
+                const third = triadType === 'maj' || triadType === 'aug' ? 4 : 3;
+                const seventh = SEVENTH_TYPES[seventhType].intervals[3];
+                chordNotes = [chordRoot, (chordRoot + third) % 12, (chordRoot + seventh) % 12];
+                symbol = SEVENTH_TYPES[seventhType].symbol + ' (shell)';
+            }
+            
+            return {
+                numeral: numeral,
+                name: NOTE_NAMES[chordRoot] + symbol,
+                type: triadType,
+                seventhType: seventhType,
+                notes: chordNotes,
+                rootMidi: chordRoot,
+                voicing: voicingType
+            };
         }
         
         function getChordMidiNotes(chord, root) {
             // Return MIDI notes for chord, 2 octaves below scale (C2 area = MIDI 36)
             const baseMidi = 36 + chord.rootMidi;
-            const intervals = chord.type === 'maj' ? [0, 4, 7] :
-                              chord.type === 'min' ? [0, 3, 7] :
-                              chord.type === 'dim' ? [0, 3, 6] :
-                              chord.type === 'aug' ? [0, 4, 8] : [0, 4, 7];
+            
+            // Get intervals based on chord data
+            let intervals;
+            if (chord.voicing === 'basic' || !chord.seventhType) {
+                intervals = CHORD_TYPES[chord.type].intervals;
+            } else if (chord.voicing === '7ths') {
+                intervals = SEVENTH_TYPES[chord.seventhType].intervals;
+            } else if (chord.voicing === 'shells') {
+                // Shell: root, 3rd, 7th
+                const third = chord.type === 'maj' || chord.type === 'aug' ? 4 : 3;
+                const seventh = SEVENTH_TYPES[chord.seventhType].intervals[3];
+                intervals = [0, third, seventh];
+            } else {
+                intervals = [0, 4, 7]; // fallback
+            }
+            
             return intervals.map(i => baseMidi + i);
+        }
+        
+        function getChordExtensions(chord, scale, scaleRoot) {
+            // Calculate available extensions (9, 11, 13) based on scale
+            // Extensions are scale tones that aren't already in the chord
+            
+            const chordRoot = chord.rootMidi;
+            const scaleIntervals = scale.intervals;
+            
+            // Find the chord root's position in the scale
+            const rootInScale = scaleIntervals.indexOf((chordRoot - scaleRoot + 12) % 12);
+            if (rootInScale === -1) return []; // Chord root not in scale
+            
+            const extensions = [];
+            
+            // 9th = 2 scale degrees up from chord root (14 semitones up from root, or 2)
+            const ninthDegree = (rootInScale + 1) % scaleIntervals.length;
+            const ninthInterval = (scaleIntervals[ninthDegree] - scaleIntervals[rootInScale] + 12) % 12;
+            let ninthName, ninthType;
+            if (ninthInterval === 1) { ninthName = '♭9'; ninthType = 'b9'; }
+            else if (ninthInterval === 2) { ninthName = '9'; ninthType = '9'; }
+            else if (ninthInterval === 3) { ninthName = '♯9'; ninthType = '#9'; }
+            else { ninthName = '9'; ninthType = '9'; }
+            
+            const ninthNote = (chordRoot + ninthInterval) % 12;
+            // b9 on major chords is usually an avoid note
+            const ninthAvoid = (chord.type === 'maj' && ninthInterval === 1);
+            extensions.push({ 
+                label: ninthName, 
+                note: NOTE_NAMES[ninthNote], 
+                interval: ninthInterval,
+                avoid: ninthAvoid
+            });
+            
+            // 11th = 4 scale degrees up (17 semitones, or 5)
+            const eleventhDegree = (rootInScale + 3) % scaleIntervals.length;
+            const eleventhRaw = scaleIntervals[eleventhDegree] - scaleIntervals[rootInScale];
+            const eleventhInterval = eleventhRaw < 0 ? eleventhRaw + 12 : eleventhRaw;
+            let eleventhName;
+            if (eleventhInterval === 5) { eleventhName = '11'; }
+            else if (eleventhInterval === 6) { eleventhName = '♯11'; }
+            else if (eleventhInterval === 4) { eleventhName = '♭11'; }
+            else { eleventhName = '11'; }
+            
+            const eleventhNote = (chordRoot + eleventhInterval) % 12;
+            // Natural 11 on major chords clashes with the 3rd
+            const eleventhAvoid = (chord.type === 'maj' && eleventhInterval === 5);
+            extensions.push({ 
+                label: eleventhName, 
+                note: NOTE_NAMES[eleventhNote], 
+                interval: eleventhInterval,
+                avoid: eleventhAvoid
+            });
+            
+            // 13th = 6 scale degrees up (21 semitones, or 9)
+            const thirteenthDegree = (rootInScale + 5) % scaleIntervals.length;
+            const thirteenthRaw = scaleIntervals[thirteenthDegree] - scaleIntervals[rootInScale];
+            const thirteenthInterval = thirteenthRaw < 0 ? thirteenthRaw + 12 : thirteenthRaw;
+            let thirteenthName;
+            if (thirteenthInterval === 9) { thirteenthName = '13'; }
+            else if (thirteenthInterval === 8) { thirteenthName = '♭13'; }
+            else if (thirteenthInterval === 10) { thirteenthName = '♯13'; }
+            else { thirteenthName = '13'; }
+            
+            const thirteenthNote = (chordRoot + thirteenthInterval) % 12;
+            // b13 on minor chords can be dark but usually okay
+            extensions.push({ 
+                label: thirteenthName, 
+                note: NOTE_NAMES[thirteenthNote], 
+                interval: thirteenthInterval,
+                avoid: false
+            });
+            
+            return extensions;
         }
 
         // ============================================
@@ -1878,14 +2263,27 @@
                 }
             });
             
-            // Auto-scroll to center on the highlighted scale
+            // Auto-scroll logic
             if (selectedScale) {
-                const targetMidi = 60 + selectedRoot + 6; // Center of the highlighted octave
+                const wrapper = document.querySelector('.piano-wrapper');
+                const wrapperRect = wrapper.getBoundingClientRect();
+                
+                let targetMidi;
+                
+                if (selectedChord) {
+                    // Center between chord (left hand) and scale (right hand)
+                    const chordMidiNotes = getChordMidiNotes(selectedChord, selectedRoot);
+                    const chordCenter = chordMidiNotes[0]; // Root of chord (~36-48)
+                    const scaleCenter = 60 + selectedRoot + 6; // Center of scale octave (~66-78)
+                    targetMidi = Math.round((chordCenter + scaleCenter) / 2); // Midpoint
+                } else {
+                    // Just center on scale
+                    targetMidi = 60 + selectedRoot + 6;
+                }
+                
                 const targetKey = piano.querySelector(`[data-midi="${targetMidi}"]`);
                 if (targetKey) {
-                    const wrapper = document.querySelector('.piano-wrapper');
                     const keyRect = targetKey.getBoundingClientRect();
-                    const wrapperRect = wrapper.getBoundingClientRect();
                     const scrollTarget = targetKey.offsetLeft - (wrapperRect.width / 2) + (keyRect.width / 2);
                     wrapper.scrollTo({ left: scrollTarget, behavior: 'smooth' });
                 }
@@ -2014,15 +2412,13 @@
             // Add the resolving root note at the end
             noteNames.push(rootName);
             
-            // Get chords for this scale
-            const chords = getDiatonicChords(selectedScale, selectedRoot);
-            const chordHint = selectedScale.intervals.length === 7 
-                ? 'Diatonic triads built from scale degrees'
-                : selectedScale.intervals.length === 5 
-                    ? 'Common chords used with this pentatonic'
-                    : selectedScale.intervals.length === 6
-                        ? 'Typical chords for blues progressions'
-                        : 'Suggested chords for this scale';
+            // Get chords for this scale with current voicing
+            const chords = getDiatonicChords(selectedScale, selectedRoot, currentVoicing);
+            const chordHint = currentVoicing === 'basic' 
+                ? 'Triads built from scale degrees'
+                : currentVoicing === '7ths'
+                    ? 'Full 7th chords for richer harmony'
+                    : 'Shell voicings: root + 3rd + 7th (practical jazz voicing)';
 
             scaleInfo.innerHTML = `
                 <div class="scale-info-header">
@@ -2042,7 +2438,14 @@
                 <p class="scale-description">${selectedScale.description}</p>
                 
                 <div class="chord-section">
-                    <div class="chord-section-title">Chords (Left Hand)</div>
+                    <div class="chord-section-header">
+                        <div class="chord-section-title">Chords (Left Hand)</div>
+                        <select class="voicing-select" id="voicingSelect">
+                            <option value="basic" ${currentVoicing === 'basic' ? 'selected' : ''}>Basic (Triads)</option>
+                            <option value="7ths" ${currentVoicing === '7ths' ? 'selected' : ''}>7th Chords</option>
+                            <option value="shells" ${currentVoicing === 'shells' ? 'selected' : ''}>Shell Voicings</option>
+                        </select>
+                    </div>
                     <div class="chord-grid" id="chordGrid">
                         ${chords.map((chord, i) => `
                             <button class="chord-btn" data-chord-index="${i}">
@@ -2052,6 +2455,10 @@
                         `).join('')}
                     </div>
                     <div class="chord-notes-display" id="chordNotesDisplay">Click a chord to highlight on piano</div>
+                    <div class="extensions-section" id="extensionsSection">
+                        <div class="extensions-title">Available Extensions (click to hear with chord)</div>
+                        <div class="extensions-grid" id="extensionsGrid"></div>
+                    </div>
                     <div class="chord-hint">${chordHint}</div>
                 </div>
                 
@@ -2071,6 +2478,14 @@
                 </div>
             `;
             
+            // Add voicing select listener
+            document.getElementById('voicingSelect').addEventListener('change', (e) => {
+                currentVoicing = e.target.value;
+                selectedChord = null; // Reset selected chord when changing voicing
+                updateScaleInfo();
+                updatePianoHighlights();
+            });
+            
             // Add chord button listeners
             const chordBtns = document.querySelectorAll('.chord-btn');
             chordBtns.forEach(btn => {
@@ -2082,10 +2497,14 @@
                     // Deselect all
                     chordBtns.forEach(b => b.classList.remove('active'));
                     
+                    const extensionsSection = document.getElementById('extensionsSection');
+                    const extensionsGrid = document.getElementById('extensionsGrid');
+                    
                     if (isActive) {
                         // Clicked active chord - deselect
                         selectedChord = null;
                         document.getElementById('chordNotesDisplay').textContent = 'Click a chord to highlight on piano';
+                        extensionsSection.classList.remove('visible');
                     } else {
                         // Select this chord
                         btn.classList.add('active');
@@ -2093,6 +2512,41 @@
                         const midiNotes = getChordMidiNotes(selectedChord, selectedRoot);
                         const noteStr = midiNotes.map(m => midiToNoteName(m)).join(' - ');
                         document.getElementById('chordNotesDisplay').innerHTML = `<span>${selectedChord.name}:</span> ${noteStr}`;
+                        
+                        // Show extensions
+                        const extensions = getChordExtensions(selectedChord, selectedScale, selectedRoot);
+                        if (extensions.length > 0) {
+                            extensionsGrid.innerHTML = extensions.map((ext, i) => `
+                                <div class="extension-item ${ext.avoid ? 'avoid' : ''}" data-ext-index="${i}" data-ext-interval="${ext.interval}">
+                                    <span class="extension-label">${ext.label}</span>
+                                    <span class="extension-note">${ext.note}</span>
+                                </div>
+                            `).join('');
+                            extensionsSection.classList.add('visible');
+                            
+                            // Add extension click listeners
+                            const currentChord = selectedChord; // Capture for closure
+                            document.querySelectorAll('.extension-item:not(.avoid)').forEach(extItem => {
+                                extItem.addEventListener('click', async () => {
+                                    await startAudioContext();
+                                    if (sampler && sampler.loaded) {
+                                        // Get chord notes
+                                        const chordMidiNotes = getChordMidiNotes(currentChord, selectedRoot);
+                                        // Get extension note (add to chord root, in same octave as chord)
+                                        const extInterval = parseInt(extItem.dataset.extInterval);
+                                        const extMidi = 36 + currentChord.rootMidi + extInterval + 12; // One octave up from chord root
+                                        
+                                        // Play chord + extension together
+                                        chordMidiNotes.forEach(midi => {
+                                            sampler.triggerAttackRelease(midiToToneName(midi), '1.5');
+                                        });
+                                        sampler.triggerAttackRelease(midiToToneName(extMidi), '1.5');
+                                    }
+                                });
+                            });
+                        } else {
+                            extensionsSection.classList.remove('visible');
+                        }
                         
                         // Play the chord
                         if (sampler && sampler.loaded) {
